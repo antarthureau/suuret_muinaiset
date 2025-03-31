@@ -3,14 +3,17 @@
 
   The circuit on a teensy 3.2:
 	- pin 6 as a digital output, using PWM (analogWrite function)
-	- pins 18 and 19 used as SCL and SPA for the RTC module (Adafruit 8523)
+	- pins 18 and 19 used as SCL and SPA for the RTC modulex
 	- pwm output goes through an IRL520 MOSFET, that itself drives a LED strip.
+  - relays are on 21, 20, 17 and 16
 
   created 21.08.2024
   by Antoine "Arthur" Hureau-Parreira
   Ant Art Enk, Bergen NO
 
   This code relies on open-source technology and references and belongs to the public domain.
+
+  This is LONG player
 */
 
 #include <Audio.h>
@@ -19,7 +22,7 @@
 #include <SD.h>
 #include <SerialFlash.h>
 #include <elapsedMillis.h>
-#include "RTClib.h"
+#include <RTClib.h>
 
 //OBJECTS
 //audio
@@ -29,7 +32,7 @@ AudioAnalyzeRMS audioRMS;
 AudioOutputI2S audioOutput;
 AudioControlSGTL5000 sgtl5000_1;
 //rtc
-RTC_PCF8523 rtc;
+RTC_DS3231 rtc;
 
 //AUDIO MATRIX
 AudioConnection patchCord1(playSdWav1, 0, audioOutput, 0);
@@ -42,8 +45,18 @@ AudioConnection patchCord3(playSdWav1, 0, audioRMS, 0);
 #define SDCARD_SCK_PIN 14
 
 //PINS
+const int REL_1 = 21;
+const int REL_2 = 20;
+const int REL_3 = 17;
+const int REL_4 = 16; //relay 4 is never used
+const int LED_1 = 2;
+const int LED_2 = 3;
+const int LED_3 = 4;
+const int LED_4 = 5;
 const int PWM_PIN = 6;
-const int RELAY_PIN = 16;
+const int TRIGGER_1 = 22;
+const int TRIGGER_2 = 23;
+
 const uint8_t VOL_CTRL_PIN = A0;
 const uint8_t PWM_CTRL_PIN = A1;
 
@@ -51,23 +64,46 @@ const uint8_t PWM_CTRL_PIN = A1;
 float audioVolume = 0.2;
 int rangePWM = 255;
 const bool PEAK_MODE = false;
-char days[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+const char days[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 const int START_HOUR = 6;
 const int END_HOUR = 23;
-const char FILE_NAME[] = "SPIKY.wav"; //LONG.wav, SMALL.wav or SPIKY.wava depending on player
+const char FILE_NAME[] = "LONG.wav"; //LONG.wav, SMALL.wav or SEASHELL.wav depending on player
+
+const uint8_t REL_ARRAY[4] = {REL_1, REL_2, REL_3, REL_4};
+const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 
 //SETUP
 void setup() {
   Serial.begin(57600);
+
+  for (int j=0;j<4;j++){
+    pinMode(LED_ARRAY[j],OUTPUT);
+  }
+  Serial.println("Leds array setup");
+
+  for (int i=0;i<4;i++){
+    pinMode(REL_ARRAY[i],OUTPUT);
+  }
+  Serial.println("Relays array setup");
+
+  pinMode(PWM_PIN, OUTPUT);
+  pinMode(TRIGGER_1, OUTPUT);
+  pinMode(TRIGGER_2, OUTPUT);
+  Serial.println("PWM and listen pins setup");
 
   //audio memory allocation, codec and volume setup
   AudioMemory(8);
   sgtl5000_1.enable();
   sgtl5000_1.volume(audioVolume);
 
+  Serial.println("Audio memory allocated");
+
   // Configure SPI communication for the SD card
   SPI.setMOSI(SDCARD_MOSI_PIN);
   SPI.setSCK(SDCARD_SCK_PIN);
+
+  Serial.println("SPI communication configures");
+  Serial.println("SD card initialization...");
   
   // Check SD card accessibility
   if (!(SD.begin(SDCARD_CS_PIN))) {
@@ -79,23 +115,12 @@ void setup() {
     Serial.println("SD card loaded");
   }
 
-  //Declare pins
-  pinMode(PWM_PIN, OUTPUT);
-  pinMode(RELAY_PIN, OUTPUT);
-
   //help function to init RTC
   setupRTC();
-
-  //flash light 4 times at startup (1 sec)
-  for (int i=0; i < 4; i++){
-    analogWrite(PWM_PIN, 1);
-    delay(50);
-    analogWrite(PWM_PIN, 0);
-    delay(50);
-  }
+  Serial.println("RTC setup");
   
   //flag for initialization complete
-  Serial.println("Initialized");
+  Serial.println("Setup complete!");
 }
 
 
@@ -105,73 +130,73 @@ elapsedMillis fps;
 //LOOP
 void loop() {
   if (rtc.now().hour() >= START_HOUR){
-      if (rtc.now().hour() <= END_HOUR){
+    if (rtc.now().hour() <= END_HOUR){
+      digitalWrite(REL_1, HIGH); //opens 230V AC Line to the PSU
+      delay(500);
+      digitalWrite(REL_2, HIGH); //opens 36V DC line from the PSU to the amplifier
+      delay(500);
+      digitalWrite(REL_3, HIGH); //opens audio line from the amplifier to the speaker
 
-        digitalWrite(RELAY_PIN, HIGH);
-        if (playSdWav1.isPlaying() == false) {
-          Serial.print("Start playing ");
-          Serial.println(FILE_NAME);
-          playSdWav1.play(FILE_NAME);
-        }
-        //while playing
-        while (playSdWav1.isPlaying() == true) {
-          writeOutPWM(PWM_PIN, PEAK_MODE);
-          volumeControl();
-          //pwmControl();
-        }
-        clockMe();
-        }
+      if (playSdWav1.isPlaying() == false) {
+        Serial.print("Start playing ");
+        Serial.println(FILE_NAME);
+        playSdWav1.play(FILE_NAME);
+      }
+
+      //while playing
+      while (playSdWav1.isPlaying() == true) {
+        writeOutPWM(PWM_PIN, PEAK_MODE);
+        digitalWrite(TRIGGER_1, HIGH);
+        digitalWrite(TRIGGER_2, HIGH);
+        volumeControl();
+        //pwmControl();
+      }
+
+      while (playSdWav1.isPlaying() == false) {
+        writeOutPWM(PWM_PIN, LOW);
+        digitalWrite(TRIGGER_1, LOW);
+        digitalWrite(TRIGGER_2, LOW);
+        volumeControl();
+        //pwmControl();
+      }
     }
+  }
 
   else{
-    digitalWrite(RELAY_PIN, LOW);
-    analogWrite(PWM_PIN, 0);
-    Serial.print("I'm asleep. ");
-    Serial.print(FILE_NAME);
-    Serial.print(" will play again from ");
+    digitalWrite(REL_3, LOW); //closes audio line from the amplifier to the speaker
+    delay(500);
+    digitalWrite(REL_2, LOW); //closes 36V DC line from the PSU to the amplifier
+    delay(500);
+    digitalWrite(REL_1, LOW); //closes 230V AC Line to the PSU
+    digitalWrite(PWM_PIN, LOW);
+
+
+    Serial.print("I'm asleep and will wake up at ");
     Serial.println(START_HOUR);
-    clockMe();
   }
 
 }
 
 //###########################################################################
-//helper function to setup the RTC module (adafruit documentation, details in "Examples > RTClib > pcf8523")
+//helper function to setup the RTC module (adafruit documentation, details in "Examples > RTClib")
 void setupRTC(){
-  //comment-out the 3 next lines when not on USB
   /*
   #ifndef ESP8266
-  while (!Serial); // wait for serial port to connect. Needed for native USB
+    while (!Serial); // wait for serial port to connect. Needed for native USB
   #endif
   */
-  
+
   if (! rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
     while (1) delay(10);
   }
 
-  if (! rtc.initialized() || rtc.lostPower()) {
-    Serial.println("RTC is NOT initialized, let's set the time!");
-
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, let's set the time!");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-
   }
-
-  //uncomment next line to update RTC time
-  //If used, be sure to compile 2 times! first with the line uncommented setup the RTC, a second time with the line commented
-  //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  rtc.start();
-
-  float drift = 43;
-  float period_sec = (7 * 86400);
-  float deviation_ppm = (drift / period_sec * 1000000);
-  float drift_unit = 4.34;
-  int offset = round(deviation_ppm / drift_unit);
-
-  clockMe(); //print date and time
-  Serial.print("Offset is "); // Print offset time
-  Serial.println(offset); // Print offset time
+  
 }
 
 //helper function to print time
@@ -199,7 +224,7 @@ void clockMe(){
  * @pin: Pin to write PWM output.
  * @peak: TRUE for peak mode, FALSE for RMS mode.
  */
-void writeOutPWM(int pin, bool peak){
+void writeOutPWM(uint8_t pin, bool peak){
   int pwm;
 
   if (fps > 24) {
@@ -231,4 +256,22 @@ void volumeControl(){
 void pwmControl(){
   int val = analogRead(PWM_CTRL_PIN);
   rangePWM = val / 4; //10bits to 0-255 scale
+}
+
+/*
+ * helper function to display a number on the LEDs
+ * @mode: true to turn on all LEDs, false to turn them off.
+ */
+void ledsArrayOnOff(bool mode){
+  if (mode == true){
+    digitalWrite(LED_1, HIGH);
+    digitalWrite(LED_2, HIGH);
+    digitalWrite(LED_3, HIGH);
+    digitalWrite(LED_4, HIGH);
+  } else{
+    digitalWrite(LED_1, LOW);
+    digitalWrite(LED_2, LOW);
+    digitalWrite(LED_3, LOW);
+    digitalWrite(LED_4, LOW);
+  }
 }
