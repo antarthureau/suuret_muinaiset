@@ -4,7 +4,7 @@
   The circuit on a teensy 4.0:
 	- pin 6 as a digital output, using PWM (analogWrite function)
 	- pins 18 and 19 used as SCL and SPA for the RTC module
-
+  - auto ID player using pins 28 and 30
 	- pwm output goes through an IRL520 MOSFET, that itself drives a LED strip.
   - relays are on 21, 20, 17 and 16
 
@@ -29,7 +29,7 @@ AudioPlaySdWav sdWav;
 AudioAnalyzePeak audioPeak;
 AudioAnalyzeRMS audioRMS;
 AudioOutputI2S audioOutput;
-AudioControlSGTL5000 sgtl5000_1;
+AudioControlSGTL5000 sgtl5000;
 //rtc
 RTC_DS3231 rtc;
 
@@ -44,10 +44,10 @@ AudioConnection patchCord3(sdWav, 0, audioRMS, 0);
 #define SDCARD_SCK_PIN 14
 
 //PINS
-const int REL_1 = 21;
-const int REL_2 = 20;
-const int REL_3 = 17;
-const int REL_4 = 16; //relay 4 is never used
+const int REL_1 = 16;
+const int REL_2 = 17;
+const int REL_3 = 20;
+const int REL_4 = 21; //relay 4 is never used
 const int LED_1 = 2;
 const int LED_2 = 3;
 const int LED_3 = 4;
@@ -102,8 +102,8 @@ void setup() {
 
   //audio memory allocation, codec and volume setup
   AudioMemory(8);
-  sgtl5000_1.enable();
-  sgtl5000_1.volume(audioVolume);
+  sgtl5000.enable();
+  sgtl5000.volume(audioVolume);
 
   Serial.println("Audio memory allocated");
 
@@ -253,7 +253,7 @@ void writeOutPWM(uint8_t pin, bool peak){
 void volumeControl(){
   float val = analogRead(VOL_CTRL_PIN);
   audioVolume = val / 1024; //10bits to 0-1 scale
-  sgtl5000_1.volume(audioVolume);
+  sgtl5000.volume(audioVolume);
 }
 
 //helper function to control the PWM range
@@ -328,7 +328,7 @@ void statusUpdates(){
   }
 }
 
-//helper function to setup playerID. 0 = LONG, 1 = SMALL, 2 = SEASHELL
+//helper function to setup playerID, pins 28 or 30 are connected to 3.3V. 0 = LONG, 1 = SMALL, 2 = SEASHELL
 void setupPlayerID(){
   pinMode(SMALL_PIN,INPUT);
   pinMode(SEASHELL_PIN,INPUT);
@@ -348,9 +348,9 @@ void setupPlayerID(){
 }
 
 void leader(){
-
+  //implement me
 }
 
 void follower(){
-  
+  //implement me
 }
