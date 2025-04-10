@@ -70,11 +70,11 @@ const bool PEAK_MODE = false;
 const char days[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 const int START_HOUR = 6;
 const int END_HOUR = 23;
-const char SM_STR[] = "SMALL.WAV";
-const char SS_STR[] = "SEASHELL.WAV";
-const char LO_STR[] = "LONG.WAV";
-const char FILE_NAME[];
-const int PLAYER_ID;
+String SM_STR = "SMALL.WAV";
+String SS_STR = "SEASHELL.WAV";
+String LO_STR = "LONG.WAV";
+String FILE_NAME = "temp string";
+int PLAYER_ID = 4;
 
 const uint8_t REL_ARRAY[4] = {REL_1, REL_2, REL_3, REL_4};
 const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
@@ -96,8 +96,8 @@ void setup() {
   Serial.println("Relays array setup");
 
   pinMode(PWM_PIN, OUTPUT);
-  pinMode(statusPin, OUTPUT);
-  pinMode(playbackPin, OUTPUT);
+  pinMode(STATUS_PIN, OUTPUT);
+  pinMode(PLAYBACK_PIN, OUTPUT);
   Serial.println("PWM and listen pins setup");
 
   //audio memory allocation, codec and volume setup
@@ -146,38 +146,12 @@ elapsedMillis fps;
 void loop() {
   statusUpdates();
 
-  //IF SYSTEM IS AWAKE
-  if (systemStatus == true) {
-    startupSequence();
-
-    if (playbackStatus == false){
-      startAudioPlayback();
-      delay(10);
-    }
-
-    //write PWM during playback
-    while (sdWav.isPlaying() == true) {
-      writeOutPWM(PWM_PIN, PEAK_MODE);
-      //volumeControl();
-      //pwmControl();
-    }
-
-    while (sdWav.isPlaying() == false) {
-      digitalWrite(PWM_PIN, LOW);
-      digitalWrite(playbackPin, LOW);
-      playbackStatus = false;
-      Serial.println("Playback finished");
-      delay(1000);
-    }
-  } 
-
-  //IF SYSTEM IS ASLEEP
-  else{
-    shutDownSequence();
-    digitalWrite(PWM_PIN, LOW);
-    clockMe();
-    Serial.print("I'm asleep and will wake up at ");
-    Serial.println(START_HOUR);
+  if (PLAYER_ID == 0){
+    digitalWrite(LED_1, HIGH);
+  } else if (PLAYER_ID == 1){
+  digitalWrite(LED_2, HIGH);
+  }  else if (PLAYER_ID == 2){
+  digitalWrite(LED_3, HIGH);
   }
 }
 
@@ -282,7 +256,7 @@ void ledsArrayOnOff(bool mode){
 
 //helper function to sequence startup of the psu, amp then speaker
 void startupSequence(){
-  digitalWrite(statusPin, HIGH);//send status signal to the other units
+  digitalWrite(STATUS_PIN, HIGH);//send status signal to the other units
   digitalWrite(REL_1, HIGH); //opens 230V AC Line to the PSU
   delay(500);
   digitalWrite(REL_2, HIGH); //opens 36V DC line from the PSU to the amplifier
@@ -293,7 +267,7 @@ void startupSequence(){
 
 //helper function to sequence shutdown of the speaker, amp then psu
 void shutDownSequence(){
-  digitalWrite(statusPin, HIGH);//send status signal to the other units
+  digitalWrite(STATUS_PIN, HIGH);//send status signal to the other units
   digitalWrite(REL_3, LOW); //closes audio line from the amplifier to the speaker
   delay(500);
   digitalWrite(REL_2, LOW); //closes 36V DC line from the PSU to the amplifier
@@ -303,24 +277,32 @@ void shutDownSequence(){
 }
 
 //helper function to manage audio playback
-void startAudioPlayback(){
+void playAudio(){
+  //sdWav.play(FILE_NAME);
+  playbackStatus = true;
+
   Serial.print("Start playing ");
   Serial.println(FILE_NAME);
-
-  digitalWrite(playbackPin, HIGH);
-  sdWav.play(FILE_NAME);
-
-  playbackStatus = true;
 }
 
 //helper function to manage audio status and playback status booleans
 void statusUpdates(){
-  if (rtc.now().hour() >= START_HOUR && rtc.now().hour() < END_HOUR) {
-    systemStatus = true;
-  } else {
-    systemStatus = false;
+  //system status
+  if (PLAYER_ID == 0){  //if LONG player
+    if (rtc.now().hour() >= START_HOUR && rtc.now().hour() < END_HOUR) {
+      systemStatus = true;
+    } else {
+      systemStatus = false;
+    }
+  } else {              //if SMALL/SEASHELL player
+    if (digitalRead(STATUS_PIN) == HIGH){
+      systemStatus = true;
+    } else {
+      systemStatus = false;      
+    }
   }
 
+  //playback status
   if (sdWav.isPlaying() == false) {
     playbackStatus = false;
   } else{
@@ -333,22 +315,55 @@ void setupPlayerID(){
   pinMode(SMALL_PIN,INPUT);
   pinMode(SEASHELL_PIN,INPUT);
 
-  if (digitalRead(SMALL_PIN) == LOW && digitalRead(SEASHELL_PIN) == LOW){
-    PLAYER_ID = 0;
-    FILE_NAME = LO_STR;
-  } else if (digitalRead(SMALL_PIN) == HIGH && digitalRead(SEASHELL_PIN) == LOW){
+  if (digitalRead(SMALL_PIN) == HIGH){
     PLAYER_ID = 1;
     FILE_NAME = SM_STR;
-  } else if (digitalRead(SMALL_PIN) == LOW && digitalRead(SEASHELL_PIN) == HIGH){
+  } else if (digitalRead(SEASHELL_PIN) == HIGH){
     PLAYER_ID = 2;
     FILE_NAME = SS_STR;
+  } else {
+  PLAYER_ID = 0;
+  FILE_NAME = LO_STR;
   }
 
-  Serial.println("Audio file setup " + FILE_NAME);
+  Serial.print("Audio file setup ");
+  Serial.println(FILE_NAME);
 }
 
 void leader(){
-  //implement me
+  //IF SYSTEM IS AWAKE
+  if (systemStatus == true) {
+    startupSequence();
+
+    if (playbackStatus == false){
+      playAudio();
+      delay(10);
+    }
+
+    //write PWM during playback
+    while (sdWav.isPlaying() == true) {
+      writeOutPWM(PWM_PIN, PEAK_MODE);
+      //volumeControl();
+      //pwmControl();
+    }
+
+    while (sdWav.isPlaying() == false) {
+      digitalWrite(PWM_PIN, LOW);
+      digitalWrite(PLAYBACK_PIN, LOW);
+      playbackStatus = false;
+      Serial.println("Playback finished");
+      delay(1000);
+    }
+  } 
+
+  //IF SYSTEM IS ASLEEP
+  else{
+    shutDownSequence();
+    digitalWrite(PWM_PIN, LOW);
+    clockMe();
+    Serial.print("I'm asleep and will wake up at ");
+    Serial.println(START_HOUR);
+  }
 }
 
 void follower(){
