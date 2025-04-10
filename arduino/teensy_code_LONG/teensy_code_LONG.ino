@@ -3,7 +3,8 @@
 
   The circuit on a teensy 4.0:
 	- pin 6 as a digital output, using PWM (analogWrite function)
-	- pins 18 and 19 used as SCL and SPA for the RTC modulex
+	- pins 18 and 19 used as SCL and SPA for the RTC module
+
 	- pwm output goes through an IRL520 MOSFET, that itself drives a LED strip.
   - relays are on 21, 20, 17 and 16
 
@@ -12,8 +13,6 @@
   Ant Art Enk, Bergen NO
 
   This code relies on open-source technology and references and belongs to the public domain.
-
-  This is LONG player
 */
 
 #include <Audio.h>
@@ -54,8 +53,10 @@ const int LED_2 = 3;
 const int LED_3 = 4;
 const int LED_4 = 5;
 const int PWM_PIN = 6;
-const int statusPin = 22;
-const int playbackPin = 23;
+const int STATUS_PIN = 22;
+const int PLAYBACK_PIN = 23;
+const int SMALL_PIN = 30;
+const int SEASHELL_PIN = 28;
 
 const uint8_t VOL_CTRL_PIN = A0;
 const uint8_t PWM_CTRL_PIN = A1;
@@ -69,7 +70,11 @@ const bool PEAK_MODE = false;
 const char days[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 const int START_HOUR = 6;
 const int END_HOUR = 23;
-const char FILE_NAME[] = "LONG.wav"; //LONG.wav, SMALL.wav or SEASHELL.wav depending on player
+const char SM_STR[] = "SMALL.WAV";
+const char SS_STR[] = "SEASHELL.WAV";
+const char LO_STR[] = "LONG.WAV";
+const char FILE_NAME[];
+const int PLAYER_ID;
 
 const uint8_t REL_ARRAY[4] = {REL_1, REL_2, REL_3, REL_4};
 const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
@@ -77,6 +82,8 @@ const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 //SETUP
 void setup() {
   Serial.begin(57600);
+
+  setupPlayerID();
 
   for (int j=0;j<4;j++){
     pinMode(LED_ARRAY[j],OUTPUT);
@@ -118,15 +125,19 @@ void setup() {
   }
 
   //help function to init RTC
-  setupRTC();
-  Serial.println("RTC setup");
-  
-  //flag for initialization complete
-  Serial.println("Setup complete!");
+  if (PLAYER_ID == 0){
+    setupRTC();
+    Serial.println("RTC setup");
 
-  delay(5000); //wait for 2 other units to listen
+    //flag for initialization complete
+    Serial.println("Setup complete!");
+
+    delay(5000); //wait for 2 other units to listen
+  } else {
+    //flag for initialization complete
+    Serial.println("Setup complete! waiting for LONG player");
+  }  
 }
-
 
 //start millis thread timer
 elapsedMillis fps;
@@ -147,7 +158,7 @@ void loop() {
     //write PWM during playback
     while (sdWav.isPlaying() == true) {
       writeOutPWM(PWM_PIN, PEAK_MODE);
-      volumeControl();
+      //volumeControl();
       //pwmControl();
     }
 
@@ -295,8 +306,10 @@ void shutDownSequence(){
 void startAudioPlayback(){
   Serial.print("Start playing ");
   Serial.println(FILE_NAME);
-  sdWav.play(FILE_NAME);
+
   digitalWrite(playbackPin, HIGH);
+  sdWav.play(FILE_NAME);
+
   playbackStatus = true;
 }
 
@@ -313,4 +326,31 @@ void statusUpdates(){
   } else{
     playbackStatus = true;
   }
+}
+
+//helper function to setup playerID. 0 = LONG, 1 = SMALL, 2 = SEASHELL
+void setupPlayerID(){
+  pinMode(SMALL_PIN,INPUT);
+  pinMode(SEASHELL_PIN,INPUT);
+
+  if (digitalRead(SMALL_PIN) == LOW && digitalRead(SEASHELL_PIN) == LOW){
+    PLAYER_ID = 0;
+    FILE_NAME = LO_STR;
+  } else if (digitalRead(SMALL_PIN) == HIGH && digitalRead(SEASHELL_PIN) == LOW){
+    PLAYER_ID = 1;
+    FILE_NAME = SM_STR;
+  } else if (digitalRead(SMALL_PIN) == LOW && digitalRead(SEASHELL_PIN) == HIGH){
+    PLAYER_ID = 2;
+    FILE_NAME = SS_STR;
+  }
+
+  Serial.println("Audio file setup " + FILE_NAME);
+}
+
+void leader(){
+
+}
+
+void follower(){
+  
 }
