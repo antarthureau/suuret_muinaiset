@@ -53,8 +53,7 @@ const int LED_2 = 3;
 const int LED_3 = 4;
 const int LED_4 = 5;
 const int PWM_PIN = 6;
-const int STATUS_PIN = 22;
-//const int PLAYBACK_PIN = 23;
+const int TRIGGER_PIN = 22;
 const int SMALL_PIN = 30;
 const int SEASHELL_PIN = 28;
 const int LONG_PIN = 32;
@@ -65,7 +64,7 @@ const uint8_t PWM_CTRL_PIN = A1;
 //VARIABLES
 float audioVolume = 0.5;
 int rangePWM = 255;
-bool systemStatus = false;
+bool systemAwake = false;
 bool playbackStatus = false;
 
 const bool PEAK_MODE = false; //Switch between peak or rms mode
@@ -98,9 +97,15 @@ void setup() {
   }
   Serial.println("Relays array setup");
 
+  if (PLAYER_ID == 0){
+    pinMode(TRIGGER_PIN, OUTPUT); //Setup trigger pin as sender
+  } else {
+    pinMode(TRIGGER_PIN, INPUT);    //setup tripper pin as receiver 
+  }
+  Serial.println("Trigger pin setup");
+
   pinMode(PWM_PIN, OUTPUT);
-  pinMode(STATUS_PIN, OUTPUT);
-  //pinMode(PLAYBACK_PIN, OUTPUT);
+  pinMode(TRIGGER_PIN, OUTPUT);
   Serial.println("PWM and listen pins setup");
 
   //audio memory allocation, codec and volume setup
@@ -266,24 +271,23 @@ void ledsArrayOnOff(bool mode){
 
 //helper function to sequence startup of the psu, amp then speaker
 void startupSequence(){
-  digitalWrite(STATUS_PIN, HIGH);//send status signal to the other units
   digitalWrite(REL_1, HIGH); //opens 230V AC Line to the PSU
   delay(500);
   digitalWrite(REL_2, HIGH); //opens 36V DC line from the PSU to the amplifier
   delay(500);
-  //digitalWrite(REL_3, HIGH); //opens audio line from the amplifier to the speaker
-  systemStatus = true;
+  systemAwake = true;
+
+  //remember to send long trigger to startup other systems!!!!!!! 
 }
 
 //helper function to sequence shutdown of the speaker, amp then psu
 void shutDownSequence(){
-  digitalWrite(STATUS_PIN, HIGH);//send status signal to the other units
-  //digitalWrite(REL_3, LOW); //closes audio line from the amplifier to the speaker
-  delay(500);
   digitalWrite(REL_2, LOW); //closes 36V DC line from the PSU to the amplifier
   delay(500);
   digitalWrite(REL_1, LOW); //closes 230V AC Line to the PSU
-  systemStatus = false;
+  systemAwake = false;
+
+  //remember to send long trigger to shutdown other systems!!!!!!!
 }
 
 //helper function to manage audio playback
@@ -300,16 +304,9 @@ void statusUpdates(){
   //system status
   if (PLAYER_ID == 0){ //if LONG player
     if (rtc.now().hour() >= START_HOUR && rtc.now().hour() < END_HOUR) {
-      systemStatus = true;
+      systemAwake = true;
     } else {
-      systemStatus = false;
-    }
-  }
-  else { //if SMALL/SEASHELL player
-    if (digitalRead(STATUS_PIN) == HIGH){
-      systemStatus = true;
-    } else {
-      systemStatus = false;      
+      systemAwake = false;
     }
   }
 
@@ -348,7 +345,7 @@ void setupPlayerID(){
 
 void leader(){
   //IF SYSTEM IS AWAKE
-  if (systemStatus == true) {
+  if (systemAwake == true) {
     startupSequence();
 
     if (playbackStatus == false){
@@ -375,3 +372,96 @@ void leader(){
 void follower(){
   //implement me
 }
+
+void sendTrigger(bool mode){
+  if (mode == true){
+    digitalWrite(TRIGGER_PIN, HIGH);
+    delay(1000);  // 1000ms = 1 second
+    digitalWrite(TRIGGER_PIN, LOW);
+  }
+
+  if (mode == false){
+    for (int i=0; i<2; i++)
+    digitalWrite(TRIGGER_PIN, HIGH);
+    delay(100);
+    digitalWrite(TRIGGER_PIN, LOW);
+    delay(100);
+  }
+}
+
+/**
+ * Function to receive and handle triggers
+ * This function blocks until a trigger is fully detected or timed out
+ * Long trigger toggles systemAwake
+ * Short double trigger calls playAudioFile()
+ */
+void receiveTrigger() {
+  // Wait for the trigger to start (pin goes HIGH)
+  while (digitalRead(TRIGGER_PIN) == LOW) {
+    // Optional: add timeout or other exit condition if needed
+    yield(); // Allow other processes to run in case of ESP boards
+  }
+  
+  // Record the start time of the trigger
+  unsigned long startTime = millis();
+  
+  // Wait for the first pulse to end (pin goes LOW)
+  while (digitalRead(TRIGGER_PIN) == HIGH) {
+    yield();
+    
+    // If pulse is longer than minimum long trigger duration, it's a long trigger
+    if (millis() - startTime >= 1000) {
+      // Continue waiting for the pulse to end
+      while (digitalRead(TRIGGER_PIN) == HIGH) {
+        yield();
+      }
+      
+      // Toggle the systemAwake state
+      systemAwake = !systemAwake;
+      return;
+    }
+  }
+  
+  // At this point, we've detected a pulse that ended before the long trigger threshold
+  unsigned long firstPulseDuration = millis() - startTime;
+  
+  // Check if the first pulse was short enough to be part of a double trigger
+  if (firstPulseDuration <= 500) {
+    // Record the end time of the first pulse
+    unsigned long firstPulseEndTime = millis();
+    
+    // Wait for the second pulse to start or timeout
+    while (digitalRead(TRIGGER_PIN) == LOW) {
+      yield();
+      // If we've waited too long for the second pulse, it's not a double trigger
+      if (millis() - firstPulseEndTime > 100) {
+        return; // First pulse was too short for a long trigger and no second pulse detected
+      }
+    }
+    
+    // Second pulse detected - record its start time
+    unsigned long secondPulseStartTime = millis();
+    
+    // Wait for the second pulse to end
+    while (digitalRead(TRIGGER_PIN) == HIGH) {
+      yield();
+      // If the second pulse is too long, it's not a valid double trigger
+      if (millis() - secondPulseStartTime > 500) {
+        // Wait for it to end anyway
+        while (digitalRead(TRIGGER_PIN) == HIGH) {
+          yield();
+        }
+        return;
+      }
+    }
+    
+    // If we got here, we detected a valid short double trigger
+    // Call the audio play function
+    playAudio();
+    return;
+  }
+  
+  // If we got here, the pulse was too long for a short trigger
+  // but too short for a long trigger - do nothing
+}
+
