@@ -1,12 +1,35 @@
 /*
-  Audio playback on a timer, and output audio RMS or peak values to PWM output
+  Sound to light system. Audio playback outputs audio RMS or peak values to PWM output, driving LED strip.
+  3 players: 1 leader (LO short for LONG) has an RTC module and control 2 followers through Serial3 (SM for SMALL and SS for SEASHELL)
 
-  The circuit on a teensy 4.0:
-	- pin 6 as a digital output, using PWM (analogWrite function)
-	- pins 18 and 19 used as SCL and SPA for the RTC module
-  - auto ID player using pins 28 or 30
-	- PWM signal goes through an IRL520 MOSFET, that itself drives a LED strip.
-  - relays are on 21, 20, 17 and 16, PCB is marked incorrectly, so the cable must connect 1-4, 2-3, 3-2, 4-1
+  PINS:
+    0 x
+    1 x
+    2 LED_1
+    3 LED_2
+    4 LED_3
+    5 LED_4
+    6 PWM_OUT (LED strip control)
+    7 x
+    8 x
+    9 x
+    10 SDCARD_CS_PIN (SD card)
+    11 SDCARD_MOSI_PIN (SD card)
+    12 x
+    13 SDCARD_SCK_PIN (SD card)
+    14 RX3 (receive serial on SM/SS, x on LO)
+    15 TX3 (send serial on LO, x on SM/SS)
+    16 REL_1 (relay PSU/amp)
+    17 REL_2 (relay speaker)
+    18 SDA0 (RTC on LO, x on SM/SS)
+    19 SCL0 (RTC on LO, x on SM/SS)
+    20 LRCLK1 (audio)
+    21 BCLK1 (audio)
+    22 VOL_CTRL_PIN (analog volume ctrl)
+    23 MCLK (audio)
+    28 PLAYED_ID (2, SS)
+    30 PLAYER_ID (1, SM)
+    32 PLAYER_ID (0, LO)
 
   created 21.08.2024
   by Antoine "Arthur" Hureau-Parreira
@@ -25,65 +48,65 @@
 
 //OBJECTS
 //audio
-AudioPlaySdWav           playWav1;
+AudioPlaySdWav           sdWav;
 AudioAnalyzePeak         audioPeak;
 AudioAnalyzeRMS          audioRMS;
 AudioOutputI2S           audioOutput;
-AudioControlSGTL5000     sgtl5000_1;
+AudioControlSGTL5000     sgtl5000;
 //rtc
 RTC_DS3231 rtc;
 
 //AUDIO MATRIX
-AudioConnection patchCord1(playWav1, 0, audioOutput, 0);
-AudioConnection patchCord2(playWav1, 0, audioPeak, 0);
-AudioConnection patchCord3(playWav1, 0, audioRMS, 0);
+AudioConnection patchCord1(sdWav, 0, audioOutput, 0);
+AudioConnection patchCord2(sdWav, 0, audioPeak, 0);
+AudioConnection patchCord3(sdWav, 0, audioRMS, 0);
 
 //SD CARD
-#define SDCARD_CS_PIN 10
-#define SDCARD_MOSI_PIN 7
-#define SDCARD_SCK_PIN 14
+const int SDCARD_CS_PIN = 10;
+const int SDCARD_MOSI_PIN = 11; //teensy uses 11 instead of 7
+const int SDCARD_SCK_PIN = 13; //teensy uses 13 instead of 14
 
-//PINS
+//DIGITAL PINS
 const int REL_1 = 16;
 const int REL_2 = 17;
-//const int REL_3 = 20;
-//const int REL_4 = 21; //relay 4 is never used
 const int LED_1 = 2;
 const int LED_2 = 3;
 const int LED_3 = 4;
 const int LED_4 = 5;
 const int PWM_PIN = 6;
-const int TRIGGER_PIN = 22;
 const int SMALL_PIN = 30;
 const int SEASHELL_PIN = 28;
 const int LONG_PIN = 32;
 
-const uint8_t VOL_CTRL_PIN = A0;
-const uint8_t PWM_CTRL_PIN = A1;
+//ANALOG PINS
+const uint8_t VOL_CTRL_PIN = A8;
 
-//VARIABLES
-float audioVolume = 0.5;
+//SYSTEM
+float audioVolume = 0.8;
 int rangePWM = 255;
 bool systemAwake = false;
 bool playbackStatus = false;
-
 const bool PEAK_MODE = false; //Switch between peak or rms mode
+
+//RTC
 const char days[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 const int START_HOUR = 6;
 const int END_HOUR = 23;
+
+//FILE NAMES AND PLAYER ID
 const char SM_STR[13] = "SMALL.WAV";
 const char SS_STR[13] = "SEASHELL.WAV";
 const char LO_STR[13] = "LONG.WAV";
-
 char FILE_NAME[13] = "";
 int PLAYER_ID;
 
-const uint8_t REL_ARRAY[4] = {REL_1, REL_2};
+//IO ARRAYS
 const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 
 //SETUP
 void setup() {
-  Serial.begin(57600);
+  Serial.begin(9600);
+  Serial3.begin(9600);
 
   setupPlayerID();
 
@@ -92,26 +115,17 @@ void setup() {
   }
   Serial.println("Leds array setup");
 
-  for (int i=0;i<2;i++){
-    pinMode(REL_ARRAY[i],OUTPUT);
-  }
+  pinMode(REL_1,OUTPUT);
+  pinMode(REL_2,OUTPUT);
   Serial.println("Relays array setup");
 
-  if (PLAYER_ID == 0){
-    pinMode(TRIGGER_PIN, OUTPUT); //Setup trigger pin as sender
-  } else {
-    pinMode(TRIGGER_PIN, INPUT);    //setup tripper pin as receiver 
-  }
-  Serial.println("Trigger pin setup");
-
   pinMode(PWM_PIN, OUTPUT);
-  pinMode(TRIGGER_PIN, OUTPUT);
   Serial.println("PWM and listen pins setup");
 
   //audio memory allocation, codec and volume setup
   AudioMemory(8);
-  sgtl5000_1.enable();
-  sgtl5000_1.volume(audioVolume);
+  sgtl5000.enable();
+  sgtl5000.volume(audioVolume);
 
   Serial.println("Audio memory allocated");
 
@@ -152,23 +166,19 @@ elapsedMillis fps;
 
 //LOOP
 void loop() {
-  //statusUpdates();
+  statusUpdates();
 
-  if (PLAYER_ID == 0){
-    digitalWrite(LED_1, HIGH);
-  } else if (PLAYER_ID == 1){
-    digitalWrite(LED_2, HIGH);
-  } else if (PLAYER_ID == 2){
-    digitalWrite(LED_3, HIGH);
+  //LO player
+  if (PLAYER_ID == 0) {
+    leader();
   }
 
-  playWav1.play(FILE_NAME);
-  delay(25);
-
-  while (playWav1.isPlaying() == true){
-    writeOutPWM(PWM_PIN, PEAK_MODE);
+  // SM/SS player
+  if (PLAYER_ID != 0) {
+    follower();
   }
-}
+} 
+
 
 //###########################################################################
 //helper function to setup the RTC module (adafruit documentation, details in "Examples > RTClib")
@@ -209,7 +219,6 @@ void clockMe(){
   Serial.print(':');
   Serial.print(input.second(), DEC);
   Serial.println();
-  delay(1000);
 }
 
 /*
@@ -242,58 +251,63 @@ void writeOutPWM(uint8_t pin, bool peak){
 void volumeControl(){
   float val = analogRead(VOL_CTRL_PIN);
   audioVolume = val / 1024; //10bits to 0-1 scale
-  sgtl5000_1.volume(audioVolume);
-}
-
-//helper function to control the PWM range
-void pwmControl(){
-  int val = analogRead(PWM_CTRL_PIN);
-  rangePWM = val / 4; //10bits to 0-255 scale
+  sgtl5000.volume(audioVolume);
 }
 
 /*
- * helper function to display a number on the LEDs
- * @mode: true to turn on all LEDs, false to turn them off.
+* helper function to write on the all four LEDs on the LEDs array
+* @valLed1: value for LED_1
+* @valLed2: value for LED_2
+* @valLed3: value for LED_3
+* @valLed4: value for LED_4
+*/
+void setLedPattern(bool valLed1, bool valLed2, bool valLed3, bool valLed4){
+  bool valuesArray[4] = {valLed1, valLed2, valLed3, valLed4};
+
+  for (int i=0; i<4; i++){
+    digitalWrite(LED_ARRAY[i], valuesArray[i]);
+  }
+}
+
+/*
+ * helper function to display a status code from 0-15 on the 4 LEDs array
+ * @code: integer from 0-15 (included)
  */
-void ledsArrayOnOff(bool mode){
-  if (mode == true){
-    digitalWrite(LED_1, HIGH);
-    digitalWrite(LED_2, HIGH);
-    digitalWrite(LED_3, HIGH);
-    digitalWrite(LED_4, HIGH);
-  } else{
-    digitalWrite(LED_1, LOW);
-    digitalWrite(LED_2, LOW);
-    digitalWrite(LED_3, LOW);
-    digitalWrite(LED_4, LOW);
+void displayBinaryCode(int code){
+  if (code >= 0 && code <= 15){
+    bool bits[4];
+    
+    // Convert the integer to its binary representation (4 bits)
+    for (int i = 3; i >= 0; i--) {
+      bits[i] = (code & 1);  // Check if the least significant bit is 1
+      code >>= 1;            // Right shift to check the next bit
+    }
+    
+    // Call ledsArrayDigit with the 4 bits
+    setLedPattern(bits[0], bits[1], bits[2], bits[3]);
+  } else {
+    Serial.println("Status code should be an integer in the 0-15 range");
   }
 }
 
 //helper function to sequence startup of the psu, amp then speaker
 void startupSequence(){
-  digitalWrite(REL_1, HIGH); //opens 230V AC Line to the PSU
-  delay(500);
-  digitalWrite(REL_2, HIGH); //opens 36V DC line from the PSU to the amplifier
-  delay(500);
-  systemAwake = true;
-
-  //remember to send long trigger to startup other systems!!!!!!! 
+  digitalWrite(REL_1, HIGH); //turns amp on
+  delay(250);
+  digitalWrite(REL_2, HIGH); //turns speaker on
 }
 
 //helper function to sequence shutdown of the speaker, amp then psu
 void shutDownSequence(){
-  digitalWrite(REL_2, LOW); //closes 36V DC line from the PSU to the amplifier
-  delay(500);
-  digitalWrite(REL_1, LOW); //closes 230V AC Line to the PSU
-  systemAwake = false;
-
-  //remember to send long trigger to shutdown other systems!!!!!!!
+  digitalWrite(REL_2, LOW); //turns speaker off
+  delay(250);
+  digitalWrite(REL_1, LOW); //turns amp off
 }
 
 //helper function to manage audio playback
 void playAudio(){
-  playWav1.play(FILE_NAME);
-  playbackStatus = true;
+  sdWav.play(FILE_NAME);
+  delay(10);
 
   Serial.print("Start playing ");
   Serial.println(FILE_NAME);
@@ -301,20 +315,18 @@ void playAudio(){
 
 //helper function to manage audio status and playback status booleans
 void statusUpdates(){
-  //system status
-  if (PLAYER_ID == 0){ //if LONG player
+  if (PLAYER_ID == 0){ 
     if (rtc.now().hour() >= START_HOUR && rtc.now().hour() < END_HOUR) {
-      systemAwake = true;
+      if (!systemAwake){
+        startupSequence();
+        systemAwake = !systemAwake;
+      }
     } else {
-      systemAwake = false;
+      if (systemAwake){
+        shutDownSequence();
+        systemAwake = !systemAwake;
+      }
     }
-  }
-
-  //playback status
-  if (playWav1.isPlaying() == false) {
-    playbackStatus = false;
-  } else{
-    playbackStatus = true;
   }
 }
 
@@ -329,12 +341,12 @@ void setupPlayerID(){
     strcpy(FILE_NAME, SM_STR);
   }
   
-  if (digitalRead(SEASHELL_PIN) == HIGH){
+  else if (digitalRead(SEASHELL_PIN) == HIGH){
     PLAYER_ID = 2;
     strcpy(FILE_NAME, SS_STR);
   }
   
-  if (digitalRead(LONG_PIN) == HIGH){
+  else if (digitalRead(LONG_PIN) == HIGH){
     PLAYER_ID = 0;
     strcpy(FILE_NAME, LO_STR);
   }
@@ -344,124 +356,83 @@ void setupPlayerID(){
 }
 
 void leader(){
-  //IF SYSTEM IS AWAKE
-  if (systemAwake == true) {
-    startupSequence();
+  if (systemAwake){
+    Serial3.write('W');
+    displayBinaryCode(15);
 
-    if (playbackStatus == false){
+    if (!sdWav.isPlaying()){
+      Serial3.write('P');
       playAudio();
-      delay(25);
     }
 
-    //write PWM during playback
-    while (playWav1.isPlaying() == true) {
-      writeOutPWM(PWM_PIN, PEAK_MODE);
+    if(sdWav.isPlaying()){
+      writeOutPWM(PWM_PIN, true);
       //volumeControl();
-      //pwmControl();
     }
-  } 
+  }
 
-  //IF SYSTEM IS ASLEEP
-  else{
-    shutDownSequence();
-    Serial.print("I'm asleep and will wake up at ");
-    Serial.println(START_HOUR);
+  if (!systemAwake){
+    Serial3.write('S');
+    displayBinaryCode(1);
   }
 }
 
 void follower(){
-  //implement me
-}
+  if (Serial3.available() > 0) {
+    char incomingByte = Serial3.read();
 
-void sendTrigger(bool mode){
-  if (mode == true){
-    digitalWrite(TRIGGER_PIN, HIGH);
-    delay(1000);  // 1000ms = 1 second
-    digitalWrite(TRIGGER_PIN, LOW);
-  }
+    switch (incomingByte) {
+      case 'A':
+        displayBinaryCode(1);
+        break;
 
-  if (mode == false){
-    for (int i=0; i<2; i++)
-    digitalWrite(TRIGGER_PIN, HIGH);
-    delay(100);
-    digitalWrite(TRIGGER_PIN, LOW);
-    delay(100);
-  }
-}
+      case 'B':
+        displayBinaryCode(2);
+        break;
 
-/**
- * Function to receive and handle triggers
- * This function blocks until a trigger is fully detected or timed out
- * Long trigger toggles systemAwake
- * Short double trigger calls playAudioFile()
- */
-void receiveTrigger() {
-  // Wait for the trigger to start (pin goes HIGH)
-  while (digitalRead(TRIGGER_PIN) == LOW) {
-    // Optional: add timeout or other exit condition if needed
-    yield(); // Allow other processes to run in case of ESP boards
-  }
-  
-  // Record the start time of the trigger
-  unsigned long startTime = millis();
-  
-  // Wait for the first pulse to end (pin goes LOW)
-  while (digitalRead(TRIGGER_PIN) == HIGH) {
-    yield();
-    
-    // If pulse is longer than minimum long trigger duration, it's a long trigger
-    if (millis() - startTime >= 1000) {
-      // Continue waiting for the pulse to end
-      while (digitalRead(TRIGGER_PIN) == HIGH) {
-        yield();
-      }
+      case 'C':
+        displayBinaryCode(4);
+        break;
+
+      case 'D':
+        displayBinaryCode(8);
+        break;
+
+      case 'P':
+        playAudio();
+        break;
+
+      case 'W':
+        if (!systemAwake){
+          systemAwake = !systemAwake;
+          startupSequence();
+        }  
+        break;
+
+      case 'S':
+        if (systemAwake){
+          systemAwake = !systemAwake;
+          shutDownSequence();
+        }  
+        break;
       
-      // Toggle the systemAwake state
-      systemAwake = !systemAwake;
-      return;
-    }
-  }
-  
-  // At this point, we've detected a pulse that ended before the long trigger threshold
-  unsigned long firstPulseDuration = millis() - startTime;
-  
-  // Check if the first pulse was short enough to be part of a double trigger
-  if (firstPulseDuration <= 500) {
-    // Record the end time of the first pulse
-    unsigned long firstPulseEndTime = millis();
-    
-    // Wait for the second pulse to start or timeout
-    while (digitalRead(TRIGGER_PIN) == LOW) {
-      yield();
-      // If we've waited too long for the second pulse, it's not a double trigger
-      if (millis() - firstPulseEndTime > 100) {
-        return; // First pulse was too short for a long trigger and no second pulse detected
-      }
-    }
-    
-    // Second pulse detected - record its start time
-    unsigned long secondPulseStartTime = millis();
-    
-    // Wait for the second pulse to end
-    while (digitalRead(TRIGGER_PIN) == HIGH) {
-      yield();
-      // If the second pulse is too long, it's not a valid double trigger
-      if (millis() - secondPulseStartTime > 500) {
-        // Wait for it to end anyway
-        while (digitalRead(TRIGGER_PIN) == HIGH) {
-          yield();
-        }
-        return;
-      }
-    }
-    
-    // If we got here, we detected a valid short double trigger
-    // Call the audio play function
-    playAudio();
-    return;
-  }
-  
-  // If we got here, the pulse was too long for a short trigger
-  // but too short for a long trigger - do nothing
-}
+      case 'M':
+        audioVolume = 0;
+        break;
 
+      default:
+        displayBinaryCode(0);
+        break;
+    }
+  } 
+
+  if (systemAwake){
+    displayBinaryCode(15);
+    if(sdWav.isPlaying()){
+      writeOutPWM(PWM_PIN, true);
+    }
+  }
+  if (!systemAwake){
+    displayBinaryCode(1);
+  }
+}
