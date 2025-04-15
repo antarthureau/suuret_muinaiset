@@ -3,15 +3,15 @@
   3 players: 1 leader (LO short for LONG) has an RTC module and control 2 followers through Serial3 (SM for SMALL and SS for SEASHELL)
 
   PINS:
-    0 x
-    1 x
+    0 x (must be NC, used for USB Serial)
+    1 x (must be NC, used for USB Serial)
     2 LED_1
     3 LED_2
     4 LED_3
     5 LED_4
     6 PWM_OUT (LED strip control)
-    7 x
-    8 x
+    7 x (can be used as receiver for Serial2)
+    8 x (can be used as transmitter for Serial2)
     9 x
     10 SDCARD_CS_PIN (SD card)
     11 SDCARD_MOSI_PIN (SD card)
@@ -30,6 +30,24 @@
     28 PLAYED_ID (2, SS)
     30 PLAYER_ID (1, SM)
     32 PLAYER_ID (0, LO)
+
+  CODES:
+    0 x
+    1 asleep
+    2 awake and not playing
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+    10
+    11
+    12
+    13
+    14
+    15 awake
 
   created 21.08.2024
   by Antoine "Arthur" Hureau-Parreira
@@ -81,17 +99,25 @@ const int LONG_PIN = 32;
 //ANALOG PINS
 const uint8_t VOL_CTRL_PIN = A8;
 
+//IO ARRAYS
+const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
+
 //SYSTEM
-float audioVolume = 0.8;
-int rangePWM = 255;
-bool systemAwake = false;
+float audioVolume = 0.8; //0-1, controls loudness
+int rangePWM = 255; //0-255, controls brightness
+int currentCode = 0; //starts at 0
+int audioMemory = 8;
+int startupDelay = 5000; //inactivity time after setup for LONG player
+int trackIteration = 0; //resets every day at START_HOUR
+const int START_HOUR = 6; //daily wake-up time
+const int END_HOUR = 23; //daily sleep time
+const int PWM_FREQ = 24; //Hz, refresh rate for the PWM
+bool systemAwake = false; //activity time between START_HOUR and END_HOUR
 bool playbackStatus = false;
-const bool PEAK_MODE = false; //Switch between peak or rms mode
+const bool PEAK_MODE = true; //Switch between peak or rms mode
 
 //RTC
 const char days[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-const int START_HOUR = 6;
-const int END_HOUR = 23;
 
 //FILE NAMES AND PLAYER ID
 const char SM_STR[13] = "SMALL.WAV";
@@ -99,9 +125,6 @@ const char SS_STR[13] = "SEASHELL.WAV";
 const char LO_STR[13] = "LONG.WAV";
 char FILE_NAME[13] = "";
 int PLAYER_ID;
-
-//IO ARRAYS
-const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 
 //SETUP
 void setup() {
@@ -152,12 +175,14 @@ void setup() {
     Serial.println("RTC setup");
 
     //flag for initialization complete
-    Serial.println("Setup complete!");
+    Serial.print("Setup complete! starting playback in ");
+    Serial.print(startupDelay/1000);
+    Serial.println("s.");
 
-    delay(5000); //wait for 2 other units to listen
+    delay(startupDelay); //wait for 2 other units to listen
   } else {
     //flag for initialization complete
-    Serial.println("Setup complete! waiting for LONG player");
+    Serial.println("Setup complete! waiting for LONG player to playback.");
   }  
 }
 
@@ -229,15 +254,15 @@ void clockMe(){
 void writeOutPWM(uint8_t pin, bool peak){
   int pwm;
 
-  if (fps > 24) {
-    if (peak == true){ //peak mode
+  if (fps > PWM_FREQ) {
+    if (peak){ //peak mode
       if (audioPeak.available()) {
         fps = 0;
         pwm = audioPeak.read() * rangePWM;
         analogWrite(pin, pwm);
       }
 
-    } else if (peak == false) { //RMS mode±
+    } else if (!peak) { //RMS mode±
       if (audioRMS.available()) {
         fps = 0;
         pwm = audioRMS.read() * rangePWM;
@@ -308,9 +333,12 @@ void shutDownSequence(){
 void playAudio(){
   sdWav.play(FILE_NAME);
   delay(10);
-
+  trackIteration += 1;
   Serial.print("Start playing ");
   Serial.println(FILE_NAME);
+  Serial.print("Track iteration nr ");
+  Serial.print(trackIteration);
+  Serial.println(" during curent session (will be deleted tomorrow morning at 6AM).");
 }
 
 //helper function to manage audio status and playback status booleans
@@ -320,6 +348,7 @@ void statusUpdates(){
       if (!systemAwake){
         startupSequence();
         systemAwake = !systemAwake;
+        trackIteration = 0;
       }
     } else {
       if (systemAwake){
@@ -363,6 +392,7 @@ void leader(){
     if (!sdWav.isPlaying()){
       Serial3.write('P');
       playAudio();
+      clockMe();
     }
 
     if(sdWav.isPlaying()){
@@ -372,7 +402,11 @@ void leader(){
   }
 
   if (!systemAwake){
+    if (!sdWav.isPlaying()){
+      sdWav.stop();
+    }
     Serial3.write('S');
+    digitalWrite(PWM_PIN, LOW);
     displayBinaryCode(1);
   }
 }
@@ -398,25 +432,26 @@ void follower(){
         displayBinaryCode(8);
         break;
 
-      case 'P':
+      case 'P': //play
         playAudio();
         break;
 
-      case 'W':
+      case 'W': //wake-up
         if (!systemAwake){
-          systemAwake = !systemAwake;
           startupSequence();
+          systemAwake = !systemAwake;
+          trackIteration = 0;
         }  
         break;
 
-      case 'S':
+      case 'S': //sleep
         if (systemAwake){
-          systemAwake = !systemAwake;
           shutDownSequence();
+          systemAwake = !systemAwake;
         }  
         break;
       
-      case 'M':
+      case 'M': //mute
         audioVolume = 0;
         break;
 
@@ -430,9 +465,126 @@ void follower(){
     displayBinaryCode(15);
     if(sdWav.isPlaying()){
       writeOutPWM(PWM_PIN, true);
+    } else if(!sdWav.isPlaying()){
+      displayBinaryCode(2);
     }
   }
   if (!systemAwake){
+    digitalWrite(PWM_PIN, LOW);
     displayBinaryCode(1);
   }
+}
+
+//should be 0-100
+void changeVolume(int volume) {
+  float newVolume = volume/100.0;
+  Serial3.print('V');
+  Serial3.println(newVolume);
+}
+
+void systemReport(int player) {
+  Serial.println("\n----- SYSTEM REPORT -----");
+  Serial.print("Player ID: ");
+  Serial.println(player);
+  
+  // SD CARD configuration
+  Serial.println("\n-- SD CARD PINS --");
+  Serial.print("CS: ");
+  Serial.println(SDCARD_CS_PIN);
+  Serial.print("MOSI: ");
+  Serial.println(SDCARD_MOSI_PIN);
+  Serial.print("SCK: ");
+  Serial.println(SDCARD_SCK_PIN);
+  
+  // Digital pins
+  Serial.println("\n-- DIGITAL PINS --");
+  Serial.print("REL_1: ");
+  Serial.println(REL_1);
+  Serial.print("REL_2: ");
+  Serial.println(REL_2);
+  Serial.print("LED_1: ");
+  Serial.println(LED_1);
+  Serial.print("LED_2: ");
+  Serial.println(LED_2);
+  Serial.print("LED_3: ");
+  Serial.println(LED_3);
+  Serial.print("LED_4: ");
+  Serial.println(LED_4);
+  Serial.print("PWM_PIN: ");
+  Serial.println(PWM_PIN);
+  Serial.print("SMALL_PIN: ");
+  Serial.println(SMALL_PIN);
+  Serial.print("SEASHELL_PIN: ");
+  Serial.println(SEASHELL_PIN);
+  Serial.print("LONG_PIN: ");
+  Serial.println(LONG_PIN);
+  
+  // Analog pins
+  Serial.println("\n-- ANALOG PINS --");
+  Serial.print("VOL_CTRL_PIN: ");
+  Serial.println(VOL_CTRL_PIN);
+  
+  // LED array
+  Serial.println("\n-- LED ARRAY --");
+  for (int i = 0; i < 4; i++) {
+    Serial.print("LED_ARRAY[");
+    Serial.print(i);
+    Serial.print("]: ");
+    Serial.println(LED_ARRAY[i]);
+  }
+  
+  // System settings
+  Serial.println("\n-- SYSTEM SETTINGS --");
+  Serial.print("Audio Volume: ");
+  Serial.println(audioVolume);
+  Serial.print("PWM Range: ");
+  Serial.println(rangePWM);
+  Serial.print("Current Code: ");
+  Serial.println(currentCode);
+  Serial.print("Audio Memory: ");
+  Serial.println(audioMemory);
+  Serial.print("Startup Delay: ");
+  Serial.print(startupDelay);
+  Serial.println(" ms");
+  Serial.print("Track Iteration: ");
+  Serial.println(trackIteration);
+  Serial.print("Start Hour: ");
+  Serial.println(START_HOUR);
+  Serial.print("End Hour: ");
+  Serial.println(END_HOUR);
+  Serial.print("PWM Frequency: ");
+  Serial.print(PWM_FREQ);
+  Serial.println(" Hz");
+  
+  // System states
+  Serial.println("\n-- SYSTEM STATES --");
+  Serial.print("System Awake: ");
+  Serial.println(systemAwake ? "YES" : "NO");
+  Serial.print("Playback Status: ");
+  Serial.println(playbackStatus ? "PLAYING" : "STOPPED");
+  Serial.print("Peak Mode: ");
+  Serial.println(PEAK_MODE ? "ENABLED" : "DISABLED");
+  
+  // Current day from RTC (if available)
+  Serial.println("\n-- DATE/TIME INFO --");
+  Serial.println("Days array: ");
+  for (int i = 0; i < 7; i++) {
+    Serial.print("  ");
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.println(days[i]);
+  }
+  
+  // File names
+  Serial.println("\n-- FILE NAMES --");
+  Serial.print("SMALL: ");
+  Serial.println(SM_STR);
+  Serial.print("SEASHELL: ");
+  Serial.println(SS_STR);
+  Serial.print("LONG: ");
+  Serial.println(LO_STR);
+  Serial.print("Current file: ");
+  Serial.println(FILE_NAME);
+  
+  Serial.println("\n----- END REPORT -----\n");
 }
