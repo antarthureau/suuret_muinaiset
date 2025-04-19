@@ -120,6 +120,7 @@ const int REL_SW_DELAY = 500;
 bool systemAwake = false;  //activity time between START_HOUR and END_HOUR
 bool playbackStatus = false;
 const bool PEAK_MODE = true;  //Switch between peak or rms mode
+bool debugMode = false;  //test mode for debugging
 
 //RTC
 const char days[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
@@ -132,7 +133,7 @@ const char TEST_STR[19] = "LONG_TEST_LOOP.WAV";
 char FILE_NAME[13] = "";
 int PLAYER_ID;
 
-//characters for serial commands
+//CONST CHAR FOR SERIAL COMMANDS
 const char CMD_WAKEUP = 'W';
 const char CMD_PLAY = 'P';
 const char CMD_SLEEP = 'S';
@@ -142,7 +143,12 @@ const char CMD_LED_2 = 'B';
 const char CMD_LED_3 = 'C';
 const char CMD_LED_4 = 'D';
 
-//SETUP
+/**
+ * ###############################
+ * ###### SETUP FUNCTION #########
+ * ###############################
+ */
+
 void setup() {
   Serial.begin(9600);
   Serial3.begin(9600);
@@ -202,12 +208,19 @@ void setup() {
   }
 }
 
-//start millis thread timer
+//start PWM frequency timer (frames-per-second)
 elapsedMillis fps;
 
-//LOOP
+/**
+ * ###############################
+ * ###### MAIN LOOP ##############
+ * ###############################
+ */
 void loop() {
-  //testLoop();
+  if (debugMode) {
+    testLoop();
+  }
+
   statusUpdates();
   checkSerialCommands();
 
@@ -222,9 +235,11 @@ void loop() {
   }
 }
 
-
-//###########################################################################
-//helper function to setup the RTC module (adafruit documentation, details in "Examples > RTClib")
+/**
+* ###############################
+* ###### HELPER FUNCTIONS #######
+* ###############################
+*/
 void setupRTC() {
   /*
   #ifndef ESP8266
@@ -243,8 +258,6 @@ void setupRTC() {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 }
-
-
 
 /*
  * helper function to write pwm output from peak or rms 
@@ -272,19 +285,26 @@ void writeOutPWM(uint8_t pin) {
   }
 }
 
-//helper function to control the audio volume
+/**
+ * helper function to format time in minutes:seconds:milliseconds
+ */
 void volumeControl() {
   float val = analogRead(VOL_CTRL_PIN);
   audioVolume = val / 1024;  //10bits to 0-1 scale
   sgtl5000.volume(audioVolume);
 }
 
-//write simple commands to Serial3
+/**
+ * helper function to send commands to the followers through Serial3
+ * @cmd: command to send (character)
+ */
 void sendCommand(char cmd) {
   Serial3.write(cmd);
 }
 
-//helper function to manage audio playback
+/**
+ * helper function to display the current time on the serial monitor
+ */
 void playAudio() {
   sdWav.play(FILE_NAME);
   delay(10);
@@ -297,6 +317,9 @@ void playAudio() {
   Serial.println(" during curent session (will be deleted tomorrow morning at 6AM).");
 }
 
+/**
+ * helper function to fade-out audio and PWM signals
+ */
 void fadeOut() {
   //stores current audio volume and pwm range values to retrieve afterwards
   const float tmpVolume = audioVolume;
@@ -319,6 +342,9 @@ void fadeOut() {
   rangePWM = tmpPWM;
 }
 
+/**
+ * main loop for LONG player
+ */
 void leader() {
   if (systemAwake) {
     sendCommand(CMD_WAKEUP);
@@ -352,6 +378,9 @@ void leader() {
   }
 }
 
+/**
+ * main loop for SMALL and SEASHELL players
+ */
 void follower() {
   if (Serial3.available() > 0) {
     char incomingByte = Serial3.read();
@@ -414,6 +443,12 @@ void follower() {
     digitalWrite(PWM_PIN, LOW);
   }
 }
+
+/**
+ * ###############################
+ * ####### TEST FUNCTIONS ########
+ * ###############################
+ */
 
 //if test mode
 void testLoop() {
