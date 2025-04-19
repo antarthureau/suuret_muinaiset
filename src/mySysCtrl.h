@@ -1,5 +1,5 @@
 /**
- * mySysCtrl.h - System Control Library
+ * mySysCtrl.h - System Control Library for Teensy-based Sound-to-Light Installation
  * 
  * This library provides functions to manage the system state, player identification,
  * and reporting for the Teensy-based sound-to-light installation.
@@ -14,6 +14,7 @@
 #define MYSYSCTRL_H
 
 #include <Arduino.h>
+#include <Audio.h>
 #include <RTClib.h>
 
 // External references to variables defined in the main program

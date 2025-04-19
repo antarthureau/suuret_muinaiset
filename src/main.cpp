@@ -1,5 +1,6 @@
 /*
-  Sound to light system. Audio playback outputs audio RMS or peak values to PWM output, driving LED strip.
+  Sound to light system for Suuret Muinaiset
+  Audio playback outputs audio RMS or peak values to PWM output, driving LED strip.
   3 players: 1 leader (LO short for LONG) has an RTC module and control 2 followers through Serial3 (SM for SMALL and SS for SEASHELL)
 
   PINS:
@@ -56,6 +57,7 @@
   This code relies on open-source technology and references and belongs to the public domain.
 */
 
+#include <Arduino.h>
 #include <Audio.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -63,8 +65,8 @@
 #include <SerialFlash.h>
 #include <elapsedMillis.h>
 #include <RTClib.h>
-#include "LedzCtrl.h"       //custom lib for LEDs array control
 #include "mySysCtrl.h"      //custom lib for system control
+#include "ledzCtrl.h"     //custom lib for LEDs array control
 
 //OBJECTS
 //audio
