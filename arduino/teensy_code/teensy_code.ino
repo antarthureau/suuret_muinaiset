@@ -113,7 +113,7 @@ int startupDelay = 5000;   //inactivity time after setup for LONG player
 int trackIteration = 0;    //resets every day at START_HOUR
 const int START_HOUR = 6;  //daily wake-up time
 const int END_HOUR = 23;   //daily sleep time
-const int PWM_FREQ = 24;   //Hz, refresh rate for the PWM
+int pwmFreq = 25;   //Hz, refresh rate for the PWM
 const int REL_SW_DELAY = 500;
 bool systemAwake = false;  //activity time between START_HOUR and END_HOUR
 bool playbackStatus = false;
@@ -252,7 +252,7 @@ void setupRTC() {
 void writeOutPWM(uint8_t pin) {
   int pwm;
 
-  if (fps > PWM_FREQ) {
+  if (fps > pwmFreq) {
     if (PEAK_MODE) {  //peak mode
       if (audioPeak.available()) {
         fps = 0;
@@ -268,13 +268,6 @@ void writeOutPWM(uint8_t pin) {
       }
     }
   }
-}
-
-//helper function to control the audio volume
-void volumeControl() {
-  float val = analogRead(VOL_CTRL_PIN);
-  audioVolume = val / 1024;  //10bits to 0-1 scale
-  sgtl5000.volume(audioVolume);
 }
 
 //write simple commands to Serial3

@@ -26,6 +26,7 @@ extern int trackIteration;       // Track play count for current day
 // Hardware
 extern RTC_DS3231 rtc;           // RTC module reference
 extern AudioPlaySdWav sdWav;     // Audio player reference
+extern AudioControlSGTL5000 sgtl5000; //audio control reference
 
 // External pin references
 extern const int SMALL_PIN;      // Pin for SMALL player identification
@@ -60,7 +61,7 @@ extern int rangePWM;
 extern int currentCode;
 extern int audioMemory;
 extern int startupDelay;
-extern const int PWM_FREQ;
+extern int pwmFreq;
 
 //helper function to print time
 void clockMe() {
@@ -207,7 +208,7 @@ void systemReport(int player) {
   Serial.print("End Hour: ");
   Serial.println(END_HOUR);
   Serial.print("PWM Frequency: ");
-  Serial.print(PWM_FREQ);
+  Serial.print(pwmFreq);
   Serial.println(" Hz");
 
   // System states
@@ -341,8 +342,6 @@ void setupPlayerID() {
   Serial.println(FILE_NAME);
 }
 
-
-
 /**
  * Checks for and processes commands received from the Serial monitor
  * 
@@ -350,6 +349,7 @@ void setupPlayerID() {
  * incoming serial commands. Current supported commands:
  * - "report" or "r": Triggers a system report
  * - "help" or "h": Displays available commands
+ * - "v[value]" (e.g. "v0.7"): Sets volume (0.0 to 1.0 range)
  * 
  * @return true if a command was processed, false otherwise
  */
@@ -372,7 +372,7 @@ bool checkSerialCommands() {
       inputBuffer.trim(); // Remove any whitespace
       
       // Check for report command
-      if (inputBuffer == "report" || inputBuffer == "r") {
+      if (inputBuffer == "report") {
         Serial.println("Generating system report...");
         systemReport(PLAYER_ID);
         commandProcessed = true;
@@ -382,8 +382,63 @@ bool checkSerialCommands() {
         Serial.println("\n----- AVAILABLE COMMANDS -----");
         Serial.println("report (r) - Generate system report");
         Serial.println("help (h) - Display this help message");
+        Serial.println("v[0.0-1.0] - Set volume (e.g. v0.7)");
         Serial.println("------------------------------\n");
         commandProcessed = true;
+      }
+      //check for replay command
+      else if (inputBuffer == "replay") {
+        sdWav.stop();
+        Serial.print("replay command, ");
+        commandProcessed = true;
+      }
+      //check pwm mod command
+      else if (inputBuffer.startsWith("pwm")) {
+        String pwmStr = inputBuffer.substring(3);
+        float pwm = pwmStr.toFloat() * 255.;
+        if (pwm >= 0 && pwm <= 255){
+          rangePWM = pwm;
+          Serial.print("PWM range changed to:  0.00 - ");
+          Serial.println(rangePWM);
+          commandProcessed = true;
+        } else{
+          Serial.println("Invalid PWM range. Please use a value between 0.0 and 1.0");
+          commandProcessed = true;
+        }
+      }
+      //check for PWM frequence
+      else if (inputBuffer.startsWith("freq")) {
+        String freqStr = inputBuffer.substring(4);
+        int freq = freqStr.toInt();
+        if (freq >= 0 && freq <= 100){
+          pwmFreq = freq;
+          Serial.print("PWM frequence changed to:  ");
+          Serial.println(pwmFreq);
+          commandProcessed = true;
+        } else{
+          Serial.println("Invalid PWM freq. Please use value between 0.0 and 100");
+          commandProcessed = true;
+        }
+      }
+      // Check for volume mod command
+      else if (inputBuffer.startsWith("vol")) {
+        String volumeStr;
+        if (inputBuffer.startsWith("vol")) {
+          volumeStr = inputBuffer.substring(3);
+        }
+        float volume = volumeStr.toFloat();
+        
+        // Validate the volume range
+        if (volume >= 0.0 && volume <= 1.0) {
+          Serial.print("Audio volume changed to: ");
+          Serial.println(volume);
+          sgtl5000.volume(volume);
+          audioVolume = volume;
+          commandProcessed = true;
+        } else {
+          Serial.println("Invalid volume. Please use a value between 0.0 and 1.0");
+          commandProcessed = true;
+        }
       }
       // Unknown command
       else {
