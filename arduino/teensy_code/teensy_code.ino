@@ -68,18 +68,18 @@
 
 //OBJECTS
 //audio
-AudioPlaySdWav sdWav;
+AudioPlaySdWav wavPlayer;
 AudioAnalyzePeak audioPeak;
 AudioAnalyzeRMS audioRMS;
 AudioOutputI2S audioOutput;
 AudioControlSGTL5000 sgtl5000;
-//rtc
+//RTC
 RTC_DS3231 rtc;
 
 //AUDIO MATRIX
-AudioConnection patchCord1(sdWav, 0, audioOutput, 0);
-AudioConnection patchCord2(sdWav, 0, audioPeak, 0);
-AudioConnection patchCord3(sdWav, 0, audioRMS, 0);
+AudioConnection patchCord1(wavPlayer, 0, audioOutput, 0);
+AudioConnection patchCord2(wavPlayer, 0, audioPeak, 0);
+AudioConnection patchCord3(wavPlayer, 0, audioRMS, 0);
 
 //SD CARD
 const int SDCARD_CS_PIN = 10;
@@ -102,7 +102,7 @@ const int LONG_PIN = 32;
 const uint8_t VOL_CTRL_PIN = A8;
 
 //IO ARRAYS
-const uint8_t LED_ARRAY[4] = { LED_1, LED_2, LED_3, LED_4 };
+const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 
 //SYSTEM
 float audioVolume = 0.8;  //0-1, controls loudness
@@ -118,27 +118,30 @@ const int REL_SW_DELAY = 500;
 bool systemAwake = false;  //activity time between START_HOUR and END_HOUR
 bool playbackStatus = false;
 const bool PEAK_MODE = true;  //Switch between peak or rms mode
-
-//RTC
 const char days[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
-
-//FILE NAMES AND PLAYER ID
 const char SM_STR[13] = "SMALL.WAV";
 const char SS_STR[13] = "SEASHELL.WAV";
 const char LO_STR[13] = "LONG.WAV";
-const char TEST_STR[19] = "LONG_TEST_LOOP.WAV";
 char FILE_NAME[13] = "";
+const char* TEST_STR = "LONG_TEST_LOOP.WAV";
 int PLAYER_ID;
 
-//characters for serial commands
-const char CMD_WAKEUP = 'W';
-const char CMD_PLAY = 'P';
-const char CMD_SLEEP = 'S';
-const char CMD_MUTE = 'M';
-const char CMD_LED_1 = 'A';
-const char CMD_LED_2 = 'B';
-const char CMD_LED_3 = 'C';
-const char CMD_LED_4 = 'D';
+//commands (on USB serial and Serial3) 
+const char CMD_LED_1 = '1';
+const char CMD_LED_2 = '2';
+const char CMD_LED_3 = '3';
+const char CMD_LED_4 = '4';
+const char* CMD_HELP = "help";
+const char* CMD_WAKEUP = "wakeup";
+const char* CMD_PLAY = "play";
+const char* CMD_SLEEP = "sleep";
+const char* CMD_STOP = "stop";
+const char* CMD_REPLAY = "replay";
+const char* CMD_REPORT = "report";
+const char* CMD_VOL = "vol";                // followed by a float value in the 0-1 range e.g. vol0.8
+const char* CMD_LED = "led";                // followed by an int value in the 0-15 range e.g. led15
+const char* CMD_PWM_RANGE = "pwm";          // followed by a float value in the 0-1 range e.g. pwm1.0
+const char* CMD_PWM_FREQ = "freq";          // followed by an int value in the 0-100 range e.g. freq25
 
 //SETUP
 void setup() {
@@ -207,7 +210,7 @@ elapsedMillis fps;
 void loop() {
   //testLoop();
   statusUpdates();
-  checkSerialCommands();
+  checkUsbCommands();
 
   //LO player
   if (PLAYER_ID == 0) {
@@ -242,8 +245,6 @@ void setupRTC() {
   }
 }
 
-
-
 /*
  * helper function to write pwm output from peak or rms 
  * @pin: Pin to write PWM output.
@@ -270,157 +271,73 @@ void writeOutPWM(uint8_t pin) {
   }
 }
 
-//write simple commands to Serial3
-void sendCommand(char cmd) {
-  Serial3.write(cmd);
-}
-
-//helper function to manage audio playback
-void playAudio() {
-  sdWav.play(FILE_NAME);
-  delay(10);
-  trackIteration += 1;
-  playbackStatus = true;
-  Serial.print("Start playing ");
-  Serial.println(FILE_NAME);
-  Serial.print("Track iteration nr ");
-  Serial.print(trackIteration);
-  Serial.println(" during curent session (will be deleted tomorrow morning at 6AM).");
-}
-
-void fadeOut() {
-  //stores current audio volume and pwm range values to retrieve afterwards
-  const float tmpVolume = audioVolume;
-  const int tmpPWM = rangePWM;
-
-  const int stepTime = 10;                         //in ms
-  const int steps = 1000 / stepTime;               //1s divided by step tipe
-  const float stepPWM = tmpPWM / (float)steps;     //calculates 0-255 decrement rate per setp
-  const float stepVol = tmpVolume / (float)steps;  //calculates 0-1 decrement rate per step
-
-  //take decrement .01 each 10ms, over a second
-  for (int i = 0; i < steps; i++) {
-    audioVolume -= stepVol;
-    rangePWM -= stepPWM;
-    delay(stepTime);
-  }
-
-  //readjust values after fadeout loop is done
-  audioVolume = tmpVolume;
-  rangePWM = tmpPWM;
-}
-
 void leader() {
   if (systemAwake) {
-    sendCommand(CMD_WAKEUP);
-    displayBinaryCode(8);
-    sendCommand(CMD_LED_4);
+    
 
-    if (!sdWav.isPlaying()) {
-      delay(1000); //wait a second
-      sendCommand(CMD_PLAY);
+    if (!wavPlayer.isPlaying()) {
+
+      //delay(1000); //wait a second for followers relays to activate
+      sendSerialCommand(CMD_PLAY);
       playAudio();
       clockMe();
     }
 
-    if (sdWav.isPlaying()) {
+    if (wavPlayer.isPlaying()) {
       writeOutPWM(PWM_PIN);
-      //volumeControl();
+      displayBinaryCode(8);
+      sendSerialCommand("led8");
     }
   }
 
   if (!systemAwake) {
-    if (sdWav.isPlaying()) {
-      writeOutPWM(PWM_PIN);
-      //volumeControl();
+    if (wavPlayer.isPlaying()) {
+      wavPlayer.stop();
+      sendSerialCommand(CMD_STOP);
+      digitalWrite(PWM_PIN, LOW);
     }
-    if (!sdWav.isPlaying()) {
-      sendCommand(CMD_SLEEP);
-      sendCommand(CMD_LED_1);
+    if (!wavPlayer.isPlaying()) {
+      sendSerialCommand("led1");
       displayBinaryCode(1);
       digitalWrite(PWM_PIN, LOW);
     }
   }
 }
 
-void follower() {
-  if (Serial3.available() > 0) {
-    char incomingByte = Serial3.read();
+void follower() { 
+  checkSerialCommands();
 
-    switch (incomingByte) {
-      case CMD_LED_1:
-        displayBinaryCode(1);
-        break;
-
-      case CMD_LED_2:
-        displayBinaryCode(2);
-        break;
-
-      case CMD_LED_3:
-        displayBinaryCode(4);
-        break;
-
-      case CMD_LED_4:
-        displayBinaryCode(8);
-        break;
-
-      case CMD_PLAY:  //play
-        if (sdWav.isPlaying()){
-          sdWav.stop();
-        }
-        playAudio();
-        break;
-
-      case CMD_WAKEUP:  //wake-up
-        if (!systemAwake) {
-          startupSequence();
-          systemAwake = !systemAwake;
-          trackIteration = 0;
-        }
-        break;
-
-      case CMD_SLEEP:  //sleep
-        if (systemAwake) {
-          shutDownSequence();
-          systemAwake = !systemAwake;
-        }
-        break;
-
-      case CMD_MUTE:  //mute
-        audioVolume = 0;
-        break;
-
-      default:
-        displayBinaryCode(0);
-        break;
-    }
-  }
-
-  if (systemAwake) {
-    if (sdWav.isPlaying()) {
+  if (systemAwake){
+    if (wavPlayer.isPlaying()){
       writeOutPWM(PWM_PIN);
     }
   }
+
   if (!systemAwake) {
-    digitalWrite(PWM_PIN, LOW);
+    if (wavPlayer.isPlaying()) {
+      digitalWrite(PWM_PIN, LOW);
+    }
+    if (!wavPlayer.isPlaying()) {
+      digitalWrite(PWM_PIN, LOW);
+    }
   }
 }
 
 //if test mode
 void testLoop() {
-  if (!sdWav.isPlaying()) {
+  if (!wavPlayer.isPlaying()) {
     startupSequence();
     testAudio();
   }
 
-  while (sdWav.isPlaying()) {
+  while (wavPlayer.isPlaying()) {
     writeOutPWM(PWM_PIN);
   }
 }
 
 //helper function to manage audio playback
 void testAudio() {
-  sdWav.play(TEST_STR);
+  wavPlayer.play(TEST_STR);
   delay(10);
   trackIteration += 1;
   Serial.print("Start playing test ");

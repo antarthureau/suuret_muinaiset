@@ -25,7 +25,7 @@ extern int trackIteration;       // Track play count for current day
 
 // Hardware
 extern RTC_DS3231 rtc;           // RTC module reference
-extern AudioPlaySdWav sdWav;     // Audio player reference
+extern AudioPlaySdWav wavPlayer;     // Audio player reference
 extern AudioControlSGTL5000 sgtl5000; //audio control reference
 
 // External pin references
@@ -62,6 +62,23 @@ extern int currentCode;
 extern int audioMemory;
 extern int startupDelay;
 extern int pwmFreq;
+
+extern const char CMD_LED_1;
+extern const char CMD_LED_2;
+extern const char CMD_LED_3;
+extern const char CMD_LED_4;
+extern const char* CMD_HELP;
+extern const char* CMD_WAKEUP;
+extern const char* CMD_PLAY;
+extern const char* CMD_SLEEP;
+extern const char* CMD_STOP;
+extern const char* CMD_REPLAY;
+extern const char* CMD_REPORT;
+extern const char* CMD_VOL;
+extern const char* CMD_LED;
+extern const char* CMD_PWM_RANGE;
+extern const char* CMD_PWM_FREQ;
+
 
 //helper function to print time
 void clockMe() {
@@ -132,8 +149,8 @@ void systemReport(int player) {
   Serial.println(FILE_NAME);
 
   // Track length and position
-  uint32_t trackLengthMs = sdWav.lengthMillis();
-  uint32_t trackPositionMs = sdWav.positionMillis();
+  uint32_t trackLengthMs = wavPlayer.lengthMillis();
+  uint32_t trackPositionMs = wavPlayer.positionMillis();
   if (trackLengthMs > 0 && trackPositionMs > 0){
     Serial.print("Track position ");
     Serial.print(formatTimeToMinutesSecondsMs(trackPositionMs));
@@ -249,7 +266,7 @@ void startupSequence() {
  * 
  * This function powers off the system components in the correct order,
  * but only if audio is not currently playing:
- * 1. Checks if audio is playing (sdWav.isPlaying())
+ * 1. Checks if audio is playing (wavPlayer.isPlaying())
  * 2. If not playing, turns off the speaker (REL_2)
  * 3. Waits for REL_SW_DELAY milliseconds
  * 4. Turns off the amplifier (REL_1)
@@ -261,7 +278,7 @@ void startupSequence() {
  * @note If audio is currently playing, this function does nothing
  */
 void shutDownSequence() {
-  if (!sdWav.isPlaying()) {
+  if (!wavPlayer.isPlaying()) {
     digitalWrite(REL_2, LOW);  //turns speaker off
     Serial.println("speaker is OFF");
     delay(REL_SW_DELAY);
@@ -269,6 +286,26 @@ void shutDownSequence() {
     Serial.println("amp is OFF");
     delay(REL_SW_DELAY);
   }
+}
+
+//helper function to manage audio playback
+void playAudio() {
+  wavPlayer.play(FILE_NAME);
+  delay(10);
+  trackIteration += 1;
+  playbackStatus = true;
+  Serial.print("Start playing ");
+  Serial.println(FILE_NAME);
+  Serial.print("Track iteration nr ");
+  Serial.print(trackIteration);
+  Serial.println(" during curent session (will be deleted tomorrow morning at 6AM).");
+}
+
+// Method to send a command string via Serial3
+void sendSerialCommand(String command) {
+  Serial3.println(command);
+  
+  delay(10); //debounce delay
 }
 
 /**
@@ -287,18 +324,22 @@ void statusUpdates() {
   if (PLAYER_ID == 0) {
     if (rtc.now().hour() >= START_HOUR && rtc.now().hour() < END_HOUR) {
       if (!systemAwake) {
+        sendSerialCommand(CMD_WAKEUP);
         startupSequence();
         systemAwake = !systemAwake;
         trackIteration = 0;
+        displayBinaryCode(15);
+        sendSerialCommand("led15"); //system awake
       }
     } else {
       if (systemAwake) {
+        sendSerialCommand(CMD_SLEEP);
         shutDownSequence();
         systemAwake = !systemAwake;
       }
     }
   }
-  if (!sdWav.isPlaying()) {
+  if (!wavPlayer.isPlaying()) {
     playbackStatus = false;
   }
 }
@@ -342,6 +383,8 @@ void setupPlayerID() {
   Serial.println(FILE_NAME);
 }
 
+
+
 /**
  * Checks for and processes commands received from the Serial monitor
  * 
@@ -353,7 +396,7 @@ void setupPlayerID() {
  * 
  * @return true if a command was processed, false otherwise
  */
-bool checkSerialCommands() {
+bool checkUsbCommands() {
   static String inputBuffer = "";
   bool commandProcessed = false;
   
@@ -365,35 +408,46 @@ bool checkSerialCommands() {
     if (inChar != '\n' && inChar != '\r') {
       inputBuffer += inChar;
     }
+
     // Process command on line ending
     else if (inputBuffer.length() > 0) {
       // Convert to lowercase for case-insensitive comparison
       inputBuffer.toLowerCase();
       inputBuffer.trim(); // Remove any whitespace
-      
+
+      if (PLAYER_ID == 0){
+        sendSerialCommand(inputBuffer);
+      }
+
+      // HELP
+      if (inputBuffer == CMD_HELP) {
+        Serial.println("\n----- AVAILABLE COMMANDS -----");
+        Serial.println("help - Display this help message");
+        Serial.println("report - Generate system report");
+        Serial.println("replay - Resets file playback");
+        Serial.println("vol[0.0-1.0] - Set volume (e.g. vol0.8)");
+        Serial.println("pwm[0-255] - Set PWM range (e.g. pwm255");
+        Serial.println("freq[0-100] - Sets PWM reaction frequency (e.g. freq25)");
+        Serial.println("------------------------------\n");
+        commandProcessed = true;
+      }
+
       // Check for report command
-      if (inputBuffer == "report") {
+      else if (inputBuffer == CMD_REPORT) {
         Serial.println("Generating system report...");
         systemReport(PLAYER_ID);
         commandProcessed = true;
       }
-      // Check for help command
-      else if (inputBuffer == "help" || inputBuffer == "h") {
-        Serial.println("\n----- AVAILABLE COMMANDS -----");
-        Serial.println("report (r) - Generate system report");
-        Serial.println("help (h) - Display this help message");
-        Serial.println("v[0.0-1.0] - Set volume (e.g. v0.7)");
-        Serial.println("------------------------------\n");
-        commandProcessed = true;
-      }
-      //check for replay command
-      else if (inputBuffer == "replay") {
-        sdWav.stop();
+
+      // REPLAY
+      else if (inputBuffer == CMD_REPLAY) {
+        wavPlayer.stop();
         Serial.print("replay command, ");
         commandProcessed = true;
       }
-      //check pwm mod command
-      else if (inputBuffer.startsWith("pwm")) {
+
+      //PWM RANGE
+      else if (inputBuffer.startsWith(CMD_PWM_RANGE)) {
         String pwmStr = inputBuffer.substring(3);
         float pwm = pwmStr.toFloat() * 255.;
         if (pwm >= 0 && pwm <= 255){
@@ -406,8 +460,9 @@ bool checkSerialCommands() {
           commandProcessed = true;
         }
       }
-      //check for PWM frequence
-      else if (inputBuffer.startsWith("freq")) {
+
+      // PWM FREQ
+      else if (inputBuffer.startsWith(CMD_PWM_FREQ)) {
         String freqStr = inputBuffer.substring(4);
         int freq = freqStr.toInt();
         if (freq >= 0 && freq <= 100){
@@ -420,15 +475,15 @@ bool checkSerialCommands() {
           commandProcessed = true;
         }
       }
-      // Check for volume mod command
-      else if (inputBuffer.startsWith("vol")) {
+
+      // VOLUME
+      else if (inputBuffer.startsWith(CMD_VOL)) {
         String volumeStr;
         if (inputBuffer.startsWith("vol")) {
           volumeStr = inputBuffer.substring(3);
         }
         float volume = volumeStr.toFloat();
         
-        // Validate the volume range
         if (volume >= 0.0 && volume <= 1.0) {
           Serial.print("Audio volume changed to: ");
           Serial.println(volume);
@@ -440,7 +495,171 @@ bool checkSerialCommands() {
           commandProcessed = true;
         }
       }
-      // Unknown command
+
+      // UNKNOWN
+      else {
+        Serial.print("Unknown command: ");
+        Serial.println(inputBuffer);
+        Serial.println("Type 'help' for available commands");
+        commandProcessed = true;
+      }
+      
+      // Clear buffer for next command
+      inputBuffer = "";
+    }
+  }
+  
+  return commandProcessed;
+}
+
+bool checkSerialCommands() {
+  static String inputBuffer = "";
+  bool commandProcessed = false;
+  
+  // Process any available Serial data
+  while (Serial3.available() > 0) {
+    char inChar = (char)Serial3.read();
+    
+    // Add to buffer if not a line ending
+    if (inChar != '\n' && inChar != '\r') {
+      inputBuffer += inChar;
+    }
+
+    // Process command on line ending
+    else if (inputBuffer.length() > 0) {
+      // Convert to lowercase for case-insensitive comparison
+      inputBuffer.toLowerCase();
+      inputBuffer.trim(); // Remove any whitespace
+
+      // HELP
+      if (inputBuffer.equals(CMD_HELP)) {
+        Serial.println("\n----- AVAILABLE COMMANDS -----");
+        Serial.println("help - Display this help message");
+        Serial.println("report - Generate system report");
+        Serial.println("replay - Resets file playback");
+        Serial.println("vol[0.0-1.0] - Set volume (e.g. vol0.8)");
+        Serial.println("pwm[0-255] - Set PWM range (e.g. pwm255)");
+        Serial.println("freq[0-100] - Sets PWM reaction frequency (e.g. freq25)");
+        Serial.println("------------------------------\n");
+        commandProcessed = true;
+      }
+
+      // Check for report command
+      else if (inputBuffer.equals(CMD_REPORT)) {
+        Serial.println("Generating system report...");
+        systemReport(PLAYER_ID);
+        commandProcessed = true;
+      }
+
+      // WAKEUP
+      else if (inputBuffer.equals(CMD_WAKEUP)) {
+        if (!systemAwake) {
+          startupSequence();
+          systemAwake = true;
+          Serial.println("System woken up");
+        }
+        commandProcessed = true;
+      }
+
+      // SLEEP
+      else if (inputBuffer.equals(CMD_SLEEP)) {
+        if (systemAwake) {
+          systemAwake = false;
+          shutDownSequence();
+          Serial.println("System going to sleep");
+        }
+        commandProcessed = true;
+      }
+
+      // PLAY
+      else if (inputBuffer.equals(CMD_PLAY)) {
+        playAudio();
+        Serial.println("Playing audio");
+        commandProcessed = true;
+      }
+
+      // REPLAY
+      else if (inputBuffer.equals(CMD_REPLAY)) {
+        wavPlayer.stop();
+        Serial.println("Replay command, resetting playback");
+        if (PLAYER_ID == 0) {
+          sendSerialCommand(CMD_PLAY);
+        }
+        commandProcessed = true;
+      }
+
+      // STOP
+      else if (inputBuffer.equals(CMD_STOP)) {
+        wavPlayer.stop();
+        Serial.println("Stopping audio");
+        commandProcessed = true;
+      }
+
+      //PWM RANGE
+      else if (inputBuffer.startsWith(CMD_PWM_RANGE)) {
+        String pwmStr = inputBuffer.substring(strlen(CMD_PWM_RANGE));
+        float pwm = pwmStr.toInt() * 255.;
+        
+        if (pwm >= 0 && pwm <= 255){
+          rangePWM = pwm;
+          Serial.print("PWM range changed to:  0.00 - ");
+          Serial.println(rangePWM);
+          commandProcessed = true;
+        } else{
+          Serial.println("Invalid PWM range. Please use a value between 0.0 and 1.0");
+          commandProcessed = true;
+        }
+      }
+
+      // PWM FREQ
+      else if (inputBuffer.startsWith(CMD_PWM_FREQ)) {
+        String freqStr = inputBuffer.substring(strlen(CMD_PWM_FREQ));
+        int freq = freqStr.toInt();
+        
+        if (freq >= 0 && freq <= 100) {
+          pwmFreq = freq;
+          Serial.print("PWM frequency changed to: ");
+          Serial.println(pwmFreq);
+          commandProcessed = true;
+        } else {
+          Serial.println("Invalid PWM frequency. Please use value between 0 and 100");
+          commandProcessed = true;
+        }
+      }
+
+      // VOLUME
+      else if (inputBuffer.startsWith(CMD_VOL)) {
+        String volumeStr = inputBuffer.substring(strlen(CMD_VOL));
+        float volume = volumeStr.toFloat();
+        
+        if (volume >= 0.0 && volume <= 1.0) {
+          Serial.print("Audio volume changed to: ");
+          Serial.println(volume);
+          sgtl5000.volume(volume);
+          audioVolume = volume;
+          commandProcessed = true;
+        } else {
+          Serial.println("Invalid volume. Please use a value between 0.0 and 1.0");
+          commandProcessed = true;
+        }
+      }
+
+      //LED
+      else if (inputBuffer.startsWith(CMD_LED)) {
+        String valueStr = inputBuffer.substring(strlen(CMD_LED));
+        int ledValue = valueStr.toInt();
+        
+        // Validate the range
+        if (ledValue >= 0 && ledValue <= 15) {
+          displayBinaryCode(ledValue);
+          commandProcessed = true;
+        } else {
+          Serial.println("Invalid LED value. Must be between 0 and 15");
+          commandProcessed = true;
+        }
+      }
+
+      // UNKNOWN
       else {
         Serial.print("Unknown command: ");
         Serial.println(inputBuffer);
