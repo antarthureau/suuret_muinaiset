@@ -367,24 +367,15 @@ void playAudio() {
  * and ensure reliable transmission, especially when multiple commands are sent
  * in quick succession.
  * 
- * @param command The command string to send (without delimiters)
- *                This should be the raw command like "play", "stop", etc.
- *                Delimiters (: and .) will be added automatically
+ * @param command The command character to send
  */
 void sendSerialCommand(char command) {
-  // Print the command for debugging
-  Serial.print("Sending command: '");
-  Serial.print(command);
-  Serial.println("'");
-  
-  // Send just the single character
-  Serial3.write(command);
-  
+  Serial3.write(command);  
   Serial.print("Command '");
   Serial.print(command);
   Serial.println("' was sent on Serial3");
   
-  delay(50); // Short delay to ensure transmission completes
+  delay(50);
 }
 
 /**
@@ -407,17 +398,6 @@ void statusUpdates() {
     
     if (currentTime - lastDebugTime > 30000) {
       lastDebugTime = currentTime;
-      
-      // Get current time and print it
-      DateTime now = rtc.now();
-      Serial.print("RTC time check: ");
-      Serial.print(now.hour());
-      Serial.print(":");
-      Serial.print(now.minute());
-      Serial.print(":");
-      Serial.print(now.second());
-      Serial.print(" - In range: ");
-      Serial.println((now.hour() >= START_HOUR && now.hour() < END_HOUR) ? "YES" : "NO");
     }
     
     // Only check if we're in active hours once per minute
