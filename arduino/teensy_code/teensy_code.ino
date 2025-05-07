@@ -202,7 +202,7 @@ void setup() {
     Serial.print(STARTUP_DELAY / 1000);
     Serial.println("s.");
 
-    delay(STARTUP_DELAY);  //wait for 2 other units to listen
+    //delay(STARTUP_DELAY);  //wait for 2 other units to listen
   } else {
     //flag for initialization complete
     Serial.println("Setup complete! waiting for LONG player to playback.");
@@ -211,13 +211,23 @@ void setup() {
 }
 
 //start millis thread timer
-elapsedMillis fps;
-elapsedMillis timer;
+elapsedMillis pwmTimer;       // For PWM updates
+elapsedMillis commandTimer;   // For checking commands
+elapsedMillis statusTimer;    // For status updates
+elapsedMillis displayTimer;   // For display updates
+elapsedMillis reportTimer;    // For periodic reporting (optional)
 
 //LOOP
 void loop() {
-  statusUpdates();
-  checkUsbCommands();
+  if (statusTimer >= 1000) {  // Check status every second
+    statusUpdates();
+    statusTimer = 0;
+  }
+  
+  if (commandTimer >= 20) {   // Check commands frequently (50Hz)
+    checkUsbCommands();
+    commandTimer = 0;
+  }
 
   //LO player
   if (PLAYER_ID == 0) {
@@ -229,7 +239,7 @@ void loop() {
     follower();
   }
 
-  delay(1000);
+  delay(5);
 }
 
 
@@ -260,49 +270,41 @@ void setupRTC() {
  * @peak: TRUE for peak mode, FALSE for RMS mode.
  */
 void writeOutPWM(uint8_t pin) {
-  static int pwm = 0;
-
-  if ((unsigned int)fps > (unsigned int)pwmFreq) {
-    if (PEAK_MODE) {  //peak mode
+  if (pwmTimer >= pwmFreq) {
+    pwmTimer = 0;  // Reset timer
+    
+    // Simplified peak/RMS handling
+    if (PEAK_MODE) {
       if (audioPeak.available()) {
-        fps = 0;
-        pwm = audioPeak.read() * rangePWM;
-        analogWrite(pin, pwm);
+        int pwmValue = audioPeak.read() * rangePWM;
+        analogWrite(pin, pwmValue);
       }
-
-    } else if (!PEAK_MODE) {  //RMS mode
+    } else {
       if (audioRMS.available()) {
-        fps = 0;
-        pwm = audioRMS.read() * rangePWM;
-        analogWrite(pin, pwm);
+        int pwmValue = audioRMS.read() * rangePWM;
+        analogWrite(pin, pwmValue);
       }
     }
   }
 }
 
 void leader() {
-  static unsigned long lastPlayAttempt = 0;
-  const unsigned long RETRY_INTERVAL = 10000; // 10 second retry interval
+  static elapsedMillis playbackTimer;
+  const unsigned long RETRY_INTERVAL = 5000;
   
   if (systemAwake) {
-    // Only attempt playback if not currently playing and enough time has passed
-    if (!wavPlayer.isPlaying() && (millis() - lastPlayAttempt > RETRY_INTERVAL)) {
-      lastPlayAttempt = millis();
-      
-      // Log for debugging
-      Serial.println("Attempting playback");
-      
+    if (!wavPlayer.isPlaying() && playbackTimer >= RETRY_INTERVAL) {
+      playbackTimer = 0;
       sendSerialCommand(CMD_PLAY);
       playAudio();
     }
 
-    // Set LED status and PWM output
     if (wavPlayer.isPlaying()) {
-      //digitalWrite(PWM_PIN, HIGH);
       writeOutPWM(PWM_PIN);
       displayBinaryCode(8);
     } else {
       displayBinaryCode(2);
+      digitalWrite(PWM_PIN, LOW);
     }
   } else {
     // System is asleep
@@ -314,44 +316,50 @@ void leader() {
   }
 }
 
-void follower() { 
-  static unsigned long lastCheckTime = 0;
-  const unsigned long CHECK_INTERVAL = 50; // Check for commands every 50ms
+void follower() {
+  static elapsedMillis commandCheckTimer;
+  static elapsedMillis displayUpdateTimer;
   
-  // Only check for commands periodically to reduce resource contention
-  if (millis() - lastCheckTime > CHECK_INTERVAL) {
-    lastCheckTime = millis();
+  // Check for commands more frequently
+  if (commandCheckTimer >= 10) { // 100Hz command checking
+    commandCheckTimer = 0;
     
     if (Serial3.available()) {
       char inChar = (char)Serial3.read();
       
-      // Single character commands
+      // Process commands immediately
       switch(inChar) {
-        case CMD_WAKEUP: // Wake up
-          startupSequence();
+        case CMD_WAKEUP:
           Serial.println("Wake command received");
+          startupSequence();
           break;
         
-        case CMD_SLEEP: // Sleep
-          shutDownSequence();
+        case CMD_SLEEP:
           Serial.println("Sleep command received");
+          shutDownSequence();
           break;
   
-        case CMD_REPORT: // Report
-          systemReport(PLAYER_ID);
+        case CMD_REPORT:
           Serial.println("Report command received");
+          systemReport(PLAYER_ID);
           break;
           
-        case CMD_PLAY: // Play
+        case CMD_PLAY:
           if (systemAwake) {
-            playAudio();
             Serial.println("Play command received");
+            playAudio();
           }
           break;
           
         case CMD_STOP: // Stop
-          wavPlayer.stop();
           Serial.println("Stop command received");
+          wavPlayer.stop();
+          break;
+
+        case CMD_REPLAY: // Stop
+          Serial.println("Replay command received");
+          wavPlayer.stop();
+          playAudio();
           break;
           
         case CMD_VOL_UP: // Volume up
@@ -385,29 +393,20 @@ void follower() {
           break;
       }
       
-      // Only read a limited number of bytes per check to avoid blocking
-      int maxBytesToRead = 5;
-      int bytesRead = 1; // We already read one byte
-      
-      // Clear any remaining bytes in the buffer (up to a limit)
-      while (Serial3.available() && bytesRead < maxBytesToRead) {
-        Serial3.read(); // Discard extra bytes
-        bytesRead++;
+      // Clear buffer more efficiently
+      while (Serial3.available()) {
+        Serial3.read();
       }
     }
   }
   
-  // Also, limit how often we update PWM and LEDs
-  static unsigned long lastDisplayUpdate = 0;
-  const unsigned long DISPLAY_UPDATE_INTERVAL = 40; // 25 Hz refresh rate
-  
-  if (millis() - lastDisplayUpdate > DISPLAY_UPDATE_INTERVAL) {
-    lastDisplayUpdate = millis();
+  // Update display and PWM more frequently
+  if (displayUpdateTimer >= 20) { // 50Hz refresh (more responsive than 25Hz)
+    displayUpdateTimer = 0;
     
     if (systemAwake) {
       if (wavPlayer.isPlaying()) {
         writeOutPWM(PWM_PIN);
-        //digitalWrite(PWM_PIN, HIGH);
         displayBinaryCode(8);
       } else {
         displayBinaryCode(2);

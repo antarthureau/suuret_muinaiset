@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include "WireIMXRT.h"
 #include "core_pins.h"
 /**
@@ -283,14 +284,15 @@ void systemReport(int player) {
  * by ensuring the amplifier is powered before the speaker.
  */
 void startupSequence() {
-  digitalWrite(REL_1, HIGH);  //turns amp on
-  Serial.println("amp is ON");
-  delay(REL_SW_DELAY);
-  digitalWrite(REL_2, HIGH);  //turns speaker on
-  Serial.println("speaker is ON");
-  delay(REL_SW_DELAY);
-
-  systemAwake = true;
+  if (!systemAwake){
+    digitalWrite(REL_1, HIGH);  //turns amp on
+    Serial.println("amp is ON");
+    delay(REL_SW_DELAY);
+    digitalWrite(REL_2, HIGH);  //turns speaker on
+    Serial.println("speaker is ON");
+    delay(REL_SW_DELAY);
+    systemAwake = true;
+  }
 }
 
 /**
@@ -310,6 +312,7 @@ void startupSequence() {
  * @note If audio is currently playing, this function does nothing
  */
 void shutDownSequence() {
+  if (systemAwake){
     wavPlayer.stop();
     digitalWrite(PWM_PIN, LOW);
 
@@ -321,6 +324,7 @@ void shutDownSequence() {
     delay(REL_SW_DELAY);
 
     systemAwake = false;
+  }
 }
 
 /**
@@ -374,20 +378,11 @@ void playAudio() {
  *                Delimiters (: and .) will be added automatically
  */
 void sendSerialCommand(char command) {
-  // Print the command for debugging
-  Serial.print("Sending command: '");
-  Serial.print(command);
-  Serial.println("'");
-  
-  // Send just the single character
   Serial3.write(command);
-  
   Serial.print("Command '");
   Serial.print(command);
   Serial.println("' was sent on Serial3");
-  
-  //delay(50); // Short delay to ensure transmission completes
-  delay(1000); //compensate refresh rate delay
+  delay(50); //debounce
 }
 
 /**
@@ -400,7 +395,7 @@ void sendSerialCommand(char command) {
  * - Putting the system to sleep (calling shutDownSequence()) when exiting active hours
  * - Resetting track iteration count at the start of a new active period
  * 
- * @note This function has no effect on SMALL or SEASHELL players (PLAYER_ID != 0)
+ * @note This function has no effect on SMALL or SEASHELL players besides playback status (PLAYER_ID != 0)
  */
 void statusUpdates() {
   static unsigned long lastCheck = 0;
@@ -408,16 +403,15 @@ void statusUpdates() {
   static bool initialCheckDone = false;
   
   // First check happens quickly after startup, then every minute
-  unsigned long checkInterval = initialCheckDone ? 60000 : 5000; // 1 minute or 5 seconds
+  unsigned long checkInterval = initialCheckDone ? 60000 : 5000;
   
   if (PLAYER_ID == 0 && (millis() - lastCheck > checkInterval)) {
     lastCheck = millis();
-    initialCheckDone = true; // Mark initial check as done
-    
-    // Get current hour and print it for debugging
+    initialCheckDone = true;
     DateTime now = rtc.now();
     int currentHour = now.hour();
-    
+
+    /*   
     Serial.print("Time check: ");
     Serial.print(currentHour);
     Serial.print(":");
@@ -426,8 +420,8 @@ void statusUpdates() {
     Serial.print(START_HOUR);
     Serial.print("-");
     Serial.println(END_HOUR);
+    */
     
-    // Determine if we're in active hours
     bool isActive = (currentHour >= START_HOUR && currentHour < END_HOUR);
     
     // Only transition if state has changed
@@ -453,7 +447,7 @@ void statusUpdates() {
   }
   
   // Update playback status
-  if (!wavPlayer.isPlaying() && playbackStatus) {
+  if (!wavPlayer.isPlaying()) {
     playbackStatus = false;
   }
 }
@@ -517,7 +511,7 @@ bool processCommand(char cmd) {
       Serial.println("s - Put system to sleep");
       Serial.println("p - Play audio");
       Serial.println("! - Stop audio");
-      Serial.println("z - Reset and replay audio");
+      Serial.println("z - Replay audio");
       Serial.println("+ - Increase volume");
       Serial.println("- - Decrease volume");
       Serial.println("> - Increase PWM range");
@@ -534,14 +528,12 @@ bool processCommand(char cmd) {
     case CMD_WAKEUP:
       if (!systemAwake) {
         startupSequence();
-        systemAwake = true;
         Serial.println("System woken up");
       }
       return true;
       
     case CMD_SLEEP:
       if (systemAwake) {
-        systemAwake = false;
         shutDownSequence();
         Serial.println("System going to sleep");
       }
@@ -554,10 +546,8 @@ bool processCommand(char cmd) {
       
     case CMD_REPLAY:
       wavPlayer.stop();
+      playAudio();
       Serial.println("Replay command, resetting playback");
-      if (PLAYER_ID == 0) {
-        sendSerialCommand(CMD_PLAY);
-      }
       return true;
       
     case CMD_STOP:
@@ -654,6 +644,11 @@ bool checkUsbCommands() {
       Serial.print("USB command received: '");
       Serial.print(inChar);
       Serial.println("'");
+
+      // If this is the leader, relay the command to followers
+      if (PLAYER_ID == 0) {
+        sendSerialCommand(inChar);
+      }
       
       // Process the single-character command
       switch(inChar) {
@@ -675,17 +670,11 @@ bool checkUsbCommands() {
           // Valid command - process it
           commandProcessed = processCommand(inChar);
           
-          // If this is the leader, relay the command to followers
-          if (PLAYER_ID == 0) {
-            sendSerialCommand(inChar);
-          }
-          break;
-          
         default:
           // Invalid command
-          Serial.print("Unknown command: '");
-          Serial.print(inChar);
-          Serial.println("'");
+          //Serial.print("Unknown command: '");
+          //Serial.print(inChar);
+          //Serial.println("'");
           break;
       }
     }
