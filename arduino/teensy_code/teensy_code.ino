@@ -97,9 +97,9 @@ const int LED_2 = 3;
 const int LED_3 = 4;
 const int LED_4 = 5;
 const int PWM_PIN = 6;
-const int SMALL_PIN = 32; //Swapped 30
+const int SMALL_PIN = 30;
 const int SEASHELL_PIN = 28;
-const int LONG_PIN = 30; //swapped 32
+const int LONG_PIN = 32;
 
 //ANALOG PINS
 const uint8_t VOL_CTRL_PIN = A8;
@@ -124,8 +124,8 @@ const char days[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday
 const char SM_STR[13] = "SMALL.WAV";
 const char SS_STR[13] = "SEASHELL.WAV";
 const char LO_STR[13] = "LONG.WAV";
-char FILE_NAME[13] = "";
-int PLAYER_ID = 0;
+char FILE_NAME[13];
+int PLAYER_ID;
 
 //commands (on USB serial and Serial3) 
 #define CMD_LED_1 '1'  // LED 1 control
@@ -154,7 +154,7 @@ void setup() {
     delay(STARTUP_DELAY);
   }
 
-  //setupPlayerID();
+  setupPlayerID();
 
   for (int j = 0; j < 4; j++) {
     pinMode(LED_ARRAY[j], OUTPUT);
@@ -169,7 +169,7 @@ void setup() {
   Serial.println("PWM and listen pins setup");
 
   //audio memory allocation, codec and volume setup
-  AudioMemory(64);
+  AudioMemory(128);
   sgtl5000.enable();
   sgtl5000.volume(audioVolume);
 
@@ -212,6 +212,7 @@ void setup() {
 
 //start millis thread timer
 elapsedMillis fps;
+elapsedMillis timer;
 
 //LOOP
 void loop() {
@@ -228,7 +229,7 @@ void loop() {
     follower();
   }
 
-  //delay(50);
+  delay(1000);
 }
 
 
@@ -280,112 +281,144 @@ void writeOutPWM(uint8_t pin) {
 }
 
 void leader() {
+  static unsigned long lastPlayAttempt = 0;
+  const unsigned long RETRY_INTERVAL = 10000; // 10 second retry interval
+  
   if (systemAwake) {
-    //automatic playback whenever there is no playback
-    if (!wavPlayer.isPlaying()) {
+    // Only attempt playback if not currently playing and enough time has passed
+    if (!wavPlayer.isPlaying() && (millis() - lastPlayAttempt > RETRY_INTERVAL)) {
+      lastPlayAttempt = millis();
+      
+      // Log for debugging
+      Serial.println("Attempting playback");
+      
       sendSerialCommand(CMD_PLAY);
       playAudio();
     }
 
-    //write out PWM and display playback code during playback
+    // Set LED status and PWM output
     if (wavPlayer.isPlaying()) {
-      //writeOutPWM(PWM_PIN);
-      digitalWrite(PWM_PIN, HIGH);
-    }
-  }
-
-  if (!systemAwake) {
-    //if system goes to sleep, stop audio and light and display sleep code
-    if (wavPlayer.isPlaying()) {
-      //sendSerialCommand(CMD_STOP);
-      wavPlayer.stop();
-    }
-      displayBinaryCode(1);
-      digitalWrite(PWM_PIN, LOW);
-  }
-}
-
-void follower() { 
-  // Simple single-character command processing
-  if (Serial3.available()) {
-    char inChar = (char)Serial3.read();
-    
-    // Single character commands
-    switch(inChar) {
-      case CMD_WAKEUP: // Wake up
-        startupSequence();
-        Serial.println("Wake command received");
-        break;
-      
-      case CMD_SLEEP: // Sleep
-        shutDownSequence();
-        Serial.println("Sleep command received");
-        break;
-
-      case CMD_REPORT: // Report
-        systemReport(PLAYER_ID);
-        Serial.println("Report command received");
-        break;
-        
-      case CMD_PLAY: // Play
-        if (systemAwake) {
-          //playAudio();
-          Serial.println("Play command received");
-        }
-        break;
-        
-      case CMD_STOP: // Stop
-        wavPlayer.stop();
-        Serial.println("Stop command received");
-        break;
-        
-      case CMD_VOL_UP: // Volume up
-        audioVolume += 0.1f;
-        if (audioVolume > 1.0f) audioVolume = 1.0f;
-        sgtl5000.volume(audioVolume);
-        Serial.print("Volume increased to: ");
-        Serial.println(audioVolume);
-        break;
-        
-      case CMD_VOL_DOWN: // Volume down
-        audioVolume -= 0.1f;
-        if (audioVolume < 0.0f) audioVolume = 0.0f;
-        sgtl5000.volume(audioVolume);
-        Serial.print("Volume decreased to: ");
-        Serial.println(audioVolume);
-        break;
-        
-      case CMD_PWM_UP: // PWM range up
-        rangePWM += 25; // Increase by ~10% of max (255)
-        if (rangePWM > 255) rangePWM = 255;
-        Serial.print("PWM range increased to: ");
-        Serial.println(rangePWM);
-        break;
-        
-      case CMD_PWM_DOWN: // PWM range down
-        rangePWM -= 25; // Decrease by ~10% of max (255)
-        if (rangePWM < 0) rangePWM = 0;
-        Serial.print("PWM range decreased to: ");
-        Serial.println(rangePWM);
-        break;
-    }
-  }
-
-  if (systemAwake) {
-    if (wavPlayer.isPlaying()) {
-      //writeOutPWM(PWM_PIN);
-      digitalWrite(PWM_PIN, HIGH);
+      //digitalWrite(PWM_PIN, HIGH);
+      writeOutPWM(PWM_PIN);
       displayBinaryCode(8);
     } else {
       displayBinaryCode(2);
-      digitalWrite(PWM_PIN, LOW);
     }
   } else {
+    // System is asleep
     if (wavPlayer.isPlaying()) {
       wavPlayer.stop();
     }
     displayBinaryCode(1);
     digitalWrite(PWM_PIN, LOW);
   }
+}
 
+void follower() { 
+  static unsigned long lastCheckTime = 0;
+  const unsigned long CHECK_INTERVAL = 50; // Check for commands every 50ms
+  
+  // Only check for commands periodically to reduce resource contention
+  if (millis() - lastCheckTime > CHECK_INTERVAL) {
+    lastCheckTime = millis();
+    
+    if (Serial3.available()) {
+      char inChar = (char)Serial3.read();
+      
+      // Single character commands
+      switch(inChar) {
+        case CMD_WAKEUP: // Wake up
+          startupSequence();
+          Serial.println("Wake command received");
+          break;
+        
+        case CMD_SLEEP: // Sleep
+          shutDownSequence();
+          Serial.println("Sleep command received");
+          break;
+  
+        case CMD_REPORT: // Report
+          systemReport(PLAYER_ID);
+          Serial.println("Report command received");
+          break;
+          
+        case CMD_PLAY: // Play
+          if (systemAwake) {
+            playAudio();
+            Serial.println("Play command received");
+          }
+          break;
+          
+        case CMD_STOP: // Stop
+          wavPlayer.stop();
+          Serial.println("Stop command received");
+          break;
+          
+        case CMD_VOL_UP: // Volume up
+          audioVolume += 0.1f;
+          if (audioVolume > 1.0f) audioVolume = 1.0f;
+          sgtl5000.volume(audioVolume);
+          Serial.print("Volume increased to: ");
+          Serial.println(audioVolume);
+          break;
+          
+        case CMD_VOL_DOWN: // Volume down
+          audioVolume -= 0.1f;
+          if (audioVolume < 0.0f) audioVolume = 0.0f;
+          sgtl5000.volume(audioVolume);
+          Serial.print("Volume decreased to: ");
+          Serial.println(audioVolume);
+          break;
+          
+        case CMD_PWM_UP: // PWM range up
+          rangePWM += 25; // Increase by ~10% of max (255)
+          if (rangePWM > 255) rangePWM = 255;
+          Serial.print("PWM range increased to: ");
+          Serial.println(rangePWM);
+          break;
+          
+        case CMD_PWM_DOWN: // PWM range down
+          rangePWM -= 25; // Decrease by ~10% of max (255)
+          if (rangePWM < 0) rangePWM = 0;
+          Serial.print("PWM range decreased to: ");
+          Serial.println(rangePWM);
+          break;
+      }
+      
+      // Only read a limited number of bytes per check to avoid blocking
+      int maxBytesToRead = 5;
+      int bytesRead = 1; // We already read one byte
+      
+      // Clear any remaining bytes in the buffer (up to a limit)
+      while (Serial3.available() && bytesRead < maxBytesToRead) {
+        Serial3.read(); // Discard extra bytes
+        bytesRead++;
+      }
+    }
+  }
+  
+  // Also, limit how often we update PWM and LEDs
+  static unsigned long lastDisplayUpdate = 0;
+  const unsigned long DISPLAY_UPDATE_INTERVAL = 40; // 25 Hz refresh rate
+  
+  if (millis() - lastDisplayUpdate > DISPLAY_UPDATE_INTERVAL) {
+    lastDisplayUpdate = millis();
+    
+    if (systemAwake) {
+      if (wavPlayer.isPlaying()) {
+        writeOutPWM(PWM_PIN);
+        //digitalWrite(PWM_PIN, HIGH);
+        displayBinaryCode(8);
+      } else {
+        displayBinaryCode(2);
+        digitalWrite(PWM_PIN, LOW);
+      }
+    } else {
+      if (wavPlayer.isPlaying()) {
+        wavPlayer.stop();
+      }
+      displayBinaryCode(1);
+      digitalWrite(PWM_PIN, LOW);
+    }
+  }
 }

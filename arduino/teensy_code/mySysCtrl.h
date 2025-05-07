@@ -183,6 +183,11 @@ void systemReport(int player) {
     Serial.println(formatTimeToMinutesSecondsMs(trackLengthMs));
   }
 
+  //temp
+  float temp = tempmonGetTemp();
+  Serial.print("CPU temperature: ");
+  Serial.print(temp);
+  Serial.println(" °C");
 
   // SD CARD configuration
   Serial.println("\n-- SD CARD PINS --");
@@ -364,15 +369,25 @@ void playAudio() {
  * and ensure reliable transmission, especially when multiple commands are sent
  * in quick succession.
  * 
- * @param command The command character to send
+ * @param command The command string to send (without delimiters)
+ *                This should be the raw command like "play", "stop", etc.
+ *                Delimiters (: and .) will be added automatically
  */
 void sendSerialCommand(char command) {
-  Serial3.write(command);  
+  // Print the command for debugging
+  Serial.print("Sending command: '");
+  Serial.print(command);
+  Serial.println("'");
+  
+  // Send just the single character
+  Serial3.write(command);
+  
   Serial.print("Command '");
   Serial.print(command);
   Serial.println("' was sent on Serial3");
   
-  delay(50);
+  //delay(50); // Short delay to ensure transmission completes
+  delay(1000); //compensate refresh rate delay
 }
 
 /**
@@ -388,24 +403,56 @@ void sendSerialCommand(char command) {
  * @note This function has no effect on SMALL or SEASHELL players (PLAYER_ID != 0)
  */
 void statusUpdates() {
-  if (PLAYER_ID == 0) { //if leader
-    if (rtc.now().hour() >= START_HOUR && rtc.now().hour() < END_HOUR){ //if within hours
-      if (!systemAwake) { //if asleep, wakeup
-          systemAwake = true;
+  static unsigned long lastCheck = 0;
+  static bool lastActiveState = false;
+  static bool initialCheckDone = false;
+  
+  // First check happens quickly after startup, then every minute
+  unsigned long checkInterval = initialCheckDone ? 60000 : 5000; // 1 minute or 5 seconds
+  
+  if (PLAYER_ID == 0 && (millis() - lastCheck > checkInterval)) {
+    lastCheck = millis();
+    initialCheckDone = true; // Mark initial check as done
+    
+    // Get current hour and print it for debugging
+    DateTime now = rtc.now();
+    int currentHour = now.hour();
+    
+    Serial.print("Time check: ");
+    Serial.print(currentHour);
+    Serial.print(":");
+    Serial.print(now.minute());
+    Serial.print(" - Active hours: ");
+    Serial.print(START_HOUR);
+    Serial.print("-");
+    Serial.println(END_HOUR);
+    
+    // Determine if we're in active hours
+    bool isActive = (currentHour >= START_HOUR && currentHour < END_HOUR);
+    
+    // Only transition if state has changed
+    if (isActive != lastActiveState) {
+      lastActiveState = isActive;
+      
+      if (isActive) {
+        if (!systemAwake) {
+          Serial.println("Entering active hours");
           sendSerialCommand(CMD_WAKEUP);
           startupSequence();
           trackIteration = 0;
           displayBinaryCode(15);
         }
-    } else { //else if not within hours
-      if (systemAwake) { //if awake, go to sleep
-        systemAwake = false;
-        sendSerialCommand(CMD_SLEEP);
-        shutDownSequence();
+      } else {
+        if (systemAwake) {
+          Serial.println("Exiting active hours");
+          sendSerialCommand(CMD_SLEEP);
+          shutDownSequence();
+        }
       }
     }
   }
   
+  // Update playback status
   if (!wavPlayer.isPlaying() && playbackStatus) {
     playbackStatus = false;
   }
@@ -431,186 +478,27 @@ void setupPlayerID() {
   pinMode(SEASHELL_PIN, INPUT);
   pinMode(LONG_PIN, INPUT);
 
-  if (digitalRead(SMALL_PIN) == HIGH) {
-    PLAYER_ID = 1;
-    strcpy(FILE_NAME, SM_STR);
-    // Ensure null termination (13 is the known size from declaration)
-    FILE_NAME[12] = '\0';
-  }
-
-  if (digitalRead(SEASHELL_PIN) == HIGH) {
-    PLAYER_ID = 2;
-    strcpy(FILE_NAME, SS_STR);
-    FILE_NAME[12] = '\0';
-  }
-
   if (digitalRead(LONG_PIN) == HIGH) {
     PLAYER_ID = 0;
+  } else if (digitalRead(SMALL_PIN) == HIGH) {
+    PLAYER_ID = 1;
+  } else if (digitalRead(SEASHELL_PIN) == HIGH) {
+    PLAYER_ID = 2;
+  }
+
+  Serial.print("Player ID is  ");
+  Serial.println(PLAYER_ID);
+
+  if (PLAYER_ID == 0) {
     strcpy(FILE_NAME, LO_STR);
-    FILE_NAME[12] = '\0';
+  } else if (PLAYER_ID == 1) {
+    strcpy(FILE_NAME, SM_STR);
+  } else if (PLAYER_ID == 2) {
+    strcpy(FILE_NAME, SS_STR);
   }
 
   Serial.print("Audio file setup ");
   Serial.println(FILE_NAME);
-}
-
-/**
- * Processes commands for both USB and Serial3 interfaces
- * 
- * @param cmd Command string to process
- * @param cmdLength Length of the command string
- * @return True if command was processed successfully
- * 
- * Supports commands: h/help, r/report, w/wakeup, s/sleep, p/play,
- * z/replay, !/stop, vol[0.0-1.0], pwm[0.0-1.0], freq[0-100], led[0-15]
- */
-bool processCommandComplex(char* cmd, int cmdLength) {
-  // Safety check for valid parameters
-  if (cmd == NULL || cmdLength <= 0 || cmdLength >= 32) {
-    Serial.println("Invalid command parameters");
-    return false;
-  }
-  
-  // Ensure the buffer is properly null-terminated
-  cmd[cmdLength] = '\0';
-  
-  // Convert to lowercase for case-insensitive comparison
-  for (int i = 0; i < cmdLength && i < 31; i++) {
-    cmd[i] = tolower(cmd[i]);
-  }
-  
-  // HELP command
-  if (strcmp(cmd, "h") == 0 || strcmp(cmd, "help") == 0) {
-    Serial.println("\n----- AVAILABLE COMMANDS -----");
-    Serial.println("help - Display this help message");
-    Serial.println("report - Generate system report");
-    Serial.println("replay - Resets file playback");
-    Serial.println("vol[0.0-1.0] - Set volume (e.g. vol0.8)");
-    Serial.println("pwm[0-255] - Set PWM range (e.g. pwm255)");
-    Serial.println("freq[0-100] - Sets PWM reaction frequency (e.g. freq25)");
-    Serial.println("------------------------------\n");
-    return true;
-  }
-  
-  // REPORT command
-  else if (strcmp(cmd, "r") == 0 || strcmp(cmd, "report") == 0) {
-    Serial.println("Generating system report...");
-    systemReport(PLAYER_ID);
-    return true;
-  }
-  
-  // WAKEUP command
-  else if (strcmp(cmd, "w") == 0 || strcmp(cmd, "wakeup") == 0) {
-    if (!systemAwake) {
-      startupSequence();
-      systemAwake = true;
-      Serial.println("System woken up");
-    }
-    return true;
-  }
-  
-  // SLEEP command
-  else if (strcmp(cmd, "s") == 0 || strcmp(cmd, "sleep") == 0) {
-    if (systemAwake) {
-      systemAwake = false;
-      shutDownSequence();
-      Serial.println("System going to sleep");
-    }
-    return true;
-  }
-  
-  // PLAY command
-  else if (strcmp(cmd, "p") == 0 || strcmp(cmd, "play") == 0) {
-    playAudio();
-    Serial.println("Playing audio");
-    return true;
-  }
-  
-  // REPLAY command
-  else if (strcmp(cmd, "z") == 0 || strcmp(cmd, "replay") == 0) {
-    wavPlayer.stop();
-    Serial.println("Replay command, resetting playback");
-    if (PLAYER_ID == 0) {
-      sendSerialCommand(CMD_PLAY);
-    }
-    return true;
-  }
-  
-  // STOP command
-  else if (strcmp(cmd, "!") == 0 || strcmp(cmd, "stop") == 0) {
-    wavPlayer.stop();
-    Serial.println("Stopping audio");
-    return true;
-  }
-  
-  // VOLUME command (vol0.x)
-  else if (strncmp(cmd, "vol", 3) == 0) {
-    float volume = atof(cmd + 3);
-    
-    if (volume >= 0.0 && volume <= 1.0) {
-      Serial.print("Audio volume changed to: ");
-      Serial.println(volume);
-      sgtl5000.volume(volume);
-      audioVolume = volume;
-      return true;
-    } else {
-      Serial.println("Invalid volume. Please use a value between 0.0 and 1.0");
-      return true;
-    }
-  }
-  
-  // PWM RANGE command (pwmx.xx)
-  else if (strncmp(cmd, "pwm", 3) == 0) {
-    float pwm = atof(cmd + 3) * 255.0;
-    
-    if (pwm >= 0 && pwm <= 255) {
-      rangePWM = pwm;
-      Serial.print("PWM range changed to:  0.00 - ");
-      Serial.println(rangePWM);
-      return true;
-    } else {
-      Serial.println("Invalid PWM range. Please use a value between 0.0 and 1.0");
-      return true;
-    }
-  }
-  
-  // PWM FREQ command (freqxx)
-  else if (strncmp(cmd, "freq", 4) == 0) {
-    int freq = atoi(cmd + 4);
-    
-    if (freq >= 0 && freq <= 100) {
-      pwmFreq = freq;
-      Serial.print("PWM frequency changed to: ");
-      Serial.println(pwmFreq);
-      return true;
-    } else {
-      Serial.println("Invalid PWM frequency. Please use value between 0 and 100");
-      return true;
-    }
-  }
-  
-  // LED command (ledxx)
-  else if (strncmp(cmd, "led", 3) == 0) {
-    int ledValue = atoi(cmd + 3);
-    
-    if (ledValue >= 0 && ledValue <= 15) {
-      displayBinaryCode(ledValue);
-      return true;
-    } else {
-      Serial.println("Invalid LED value. Must be between 0 and 15");
-      return true;
-    }
-  }
-  
-  // UNKNOWN command
-  else {
-    Serial.print("Unknown command: ");
-    Serial.println(cmd);
-    Serial.println("Type 'help' for available commands");
-    return true;
-  }
-  
-  return false;
 }
 
 /**
