@@ -238,7 +238,7 @@ void systemReport(int player) {
   Serial.println(rangePWM);
   Serial.print("Current Code: ");
   Serial.println(currentCode);
-  Serial.print("Audio Memory: 32");
+  //Serial.print("Audio Memory: ");
   //Serial.println(audioMemory);
   Serial.print("Startup Delay: ");
   Serial.print(STARTUP_DELAY);
@@ -341,12 +341,9 @@ void shutDownSequence() {
 */
 void playAudio() {
   wavPlayer.play(FILE_NAME);
-  delay(10);
+  delay(50);
   trackIteration += 1;
   playbackStatus = true;
-  
-  // Safety check - ensure FILE_NAME is null-terminated
-  FILE_NAME[12] = '\0';
   
   Serial.print("Start playing ");
   Serial.println(FILE_NAME);
@@ -391,49 +388,24 @@ void sendSerialCommand(char command) {
  * @note This function has no effect on SMALL or SEASHELL players (PLAYER_ID != 0)
  */
 void statusUpdates() {
-  if (PLAYER_ID == 0) {
-    // Debug output once every 30 seconds
-    static unsigned long lastDebugTime = 0;
-    unsigned long currentTime = millis();
-    
-    if (currentTime - lastDebugTime > 30000) {
-      lastDebugTime = currentTime;
-    }
-    
-    // Only check if we're in active hours once per minute
-    static unsigned long lastCheck = 0;
-    static bool wasActive = false;
-    
-    if (currentTime - lastCheck > 60000) {
-      lastCheck = currentTime;
-      
-      bool isActive = (rtc.now().hour() >= START_HOUR && rtc.now().hour() < END_HOUR);
-      
-      // Only act on changes
-      if (isActive != wasActive) {
-        Serial.print("Activity state changed from ");
-        Serial.print(wasActive ? "ACTIVE" : "INACTIVE");
-        Serial.print(" to ");
-        Serial.println(isActive ? "ACTIVE" : "INACTIVE");
-        
-        if (isActive) {
-          // Entering active period
+  if (PLAYER_ID == 0) { //if leader
+    if (rtc.now().hour() >= START_HOUR && rtc.now().hour() < END_HOUR){ //if within hours
+      if (!systemAwake) { //if asleep, wakeup
+          systemAwake = true;
           sendSerialCommand(CMD_WAKEUP);
           startupSequence();
           trackIteration = 0;
           displayBinaryCode(15);
-        } else {
-          // Exiting active period
-          sendSerialCommand(CMD_SLEEP);
-          shutDownSequence();
         }
-        
-        wasActive = isActive;
+    } else { //else if not within hours
+      if (systemAwake) { //if awake, go to sleep
+        systemAwake = false;
+        sendSerialCommand(CMD_SLEEP);
+        shutDownSequence();
       }
     }
   }
   
-  // Update playback status
   if (!wavPlayer.isPlaying() && playbackStatus) {
     playbackStatus = false;
   }

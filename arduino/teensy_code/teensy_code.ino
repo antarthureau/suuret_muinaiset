@@ -97,9 +97,9 @@ const int LED_2 = 3;
 const int LED_3 = 4;
 const int LED_4 = 5;
 const int PWM_PIN = 6;
-const int SMALL_PIN = 30;
+const int SMALL_PIN = 32; //Swapped 30
 const int SEASHELL_PIN = 28;
-const int LONG_PIN = 32;
+const int LONG_PIN = 30; //swapped 32
 
 //ANALOG PINS
 const uint8_t VOL_CTRL_PIN = A8;
@@ -125,7 +125,7 @@ const char SM_STR[13] = "SMALL.WAV";
 const char SS_STR[13] = "SEASHELL.WAV";
 const char LO_STR[13] = "LONG.WAV";
 char FILE_NAME[13] = "";
-int PLAYER_ID;
+int PLAYER_ID = 0;
 
 //commands (on USB serial and Serial3) 
 #define CMD_LED_1 '1'  // LED 1 control
@@ -154,7 +154,7 @@ void setup() {
     delay(STARTUP_DELAY);
   }
 
-  setupPlayerID();
+  //setupPlayerID();
 
   for (int j = 0; j < 4; j++) {
     pinMode(LED_ARRAY[j], OUTPUT);
@@ -169,7 +169,7 @@ void setup() {
   Serial.println("PWM and listen pins setup");
 
   //audio memory allocation, codec and volume setup
-  AudioMemory(8);
+  AudioMemory(64);
   sgtl5000.enable();
   sgtl5000.volume(audioVolume);
 
@@ -227,6 +227,8 @@ void loop() {
   if (PLAYER_ID != 0) {
     follower();
   }
+
+  //delay(50);
 }
 
 
@@ -283,7 +285,6 @@ void leader() {
     if (!wavPlayer.isPlaying()) {
       sendSerialCommand(CMD_PLAY);
       playAudio();
-      clockMe();
     }
 
     //write out PWM and display playback code during playback
@@ -296,7 +297,7 @@ void leader() {
   if (!systemAwake) {
     //if system goes to sleep, stop audio and light and display sleep code
     if (wavPlayer.isPlaying()) {
-      sendSerialCommand(CMD_STOP);
+      //sendSerialCommand(CMD_STOP);
       wavPlayer.stop();
     }
       displayBinaryCode(1);
@@ -320,10 +321,15 @@ void follower() {
         shutDownSequence();
         Serial.println("Sleep command received");
         break;
+
+      case CMD_REPORT: // Report
+        systemReport(PLAYER_ID);
+        Serial.println("Report command received");
+        break;
         
       case CMD_PLAY: // Play
         if (systemAwake) {
-          playAudio();
+          //playAudio();
           Serial.println("Play command received");
         }
         break;
@@ -364,8 +370,7 @@ void follower() {
         break;
     }
   }
-  
-  // Simple LED status display without audio analysis
+
   if (systemAwake) {
     if (wavPlayer.isPlaying()) {
       //writeOutPWM(PWM_PIN);
@@ -382,4 +387,5 @@ void follower() {
     displayBinaryCode(1);
     digitalWrite(PWM_PIN, LOW);
   }
+
 }
