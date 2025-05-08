@@ -35,7 +35,7 @@
     0 x
     1 asleep
     2 awake and not playing
-    3
+    3 unable to access SD
     4
     5
     6
@@ -45,7 +45,7 @@
     10
     11
     12
-    13
+    13 SGTL5000 not found
     14
     15 awake
 
@@ -65,6 +65,7 @@
 #include <RTClib.h>
 #include "LedzCtrl.h"       //custom lib for LEDs array control
 #include "mySysCtrl.h"      //custom lib for system control
+//#include <Watchdog_t4.h>
 
 //OBJECTS
 //audio
@@ -75,6 +76,8 @@ AudioOutputI2S audioOutput;
 AudioControlSGTL5000 sgtl5000;
 //RTC
 RTC_DS3231 rtc;
+//watchdog
+//WDT_T4<WDT1> wdt;
 
 //AUDIO MATRIX
 AudioConnection patchCord1(wavPlayer, 0, audioOutput, 0);
@@ -105,7 +108,7 @@ const uint8_t VOL_CTRL_PIN = A8;
 const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 
 //SYSTEM
-float audioVolume = 0.8;  //0-1, controls loudness
+float audioVolume = 0.3;  //0-1, controls loudness
 int rangePWM = 255;       //0-255, controls brightness
 int currentCode = 0;      //starts at 0
 const int STARTUP_DELAY = 5000;   //inactivity time after setup for LONG player
@@ -145,77 +148,105 @@ int PLAYER_ID;
 void setup() {
   Serial.begin(9600);
   Serial3.begin(9600);
-
-  if (CrashReport){
-    Serial.print(CrashReport);
-    delay(STARTUP_DELAY);
+  
+  //WDT_timings_t config;
+  //config.timeout = 5;
+  //wdt.begin(config);
+  
+  // Log any crash report data
+  if (CrashReport) {
+    Serial.print("Previous crash detected: ");
+    Serial.println(CrashReport);
+    delay(1000);
+  } else{
+    Serial.println("No crash report available.");
   }
 
   setupPlayerID();
 
+  // Initialize LED array pins
   for (int j = 0; j < 4; j++) {
     pinMode(LED_ARRAY[j], OUTPUT);
+    digitalWrite(LED_ARRAY[j], LOW); // Start with LEDs off
   }
-  Serial.println("Leds array setup");
+  Serial.println("LEDs array setup");
 
+  // Initialize relay pins with safe state
   pinMode(REL_1, OUTPUT);
+  digitalWrite(REL_1, LOW);
   pinMode(REL_2, OUTPUT);
+  digitalWrite(REL_2, LOW);
   Serial.println("Relays array setup");
 
   pinMode(PWM_PIN, OUTPUT);
-  Serial.println("PWM and listen pins setup");
+  digitalWrite(PWM_PIN, LOW); // Start with PWM off
+  Serial.println("PWM pin setup");
 
-  //audio memory allocation, codec and volume setup
-  AudioMemory(128);
-  sgtl5000.enable();
+  // Audio memory allocation with error handling
+  if (AudioMemoryUsage() > 0) {
+    Serial.println("Audio memory already in use");
+  } else{
+    Serial.println("Audio memory is empty, let's allocate it.");
+  }
+  AudioMemory(64);
+  
+  // Enable audio codec with error checking
+  while (!sgtl5000.enable()) {
+    Serial.println("ERROR: Audio codec failed to enable");
+    displayBinaryCode(13); // Error indication
+    delay(1000);
+  }
   sgtl5000.volume(audioVolume);
-
   Serial.println("Audio memory allocated");
 
-  // Configure SPI communication for the SD card
+  // Configure SPI for SD card with error handling
   SPI.setMOSI(SDCARD_MOSI_PIN);
   SPI.setSCK(SDCARD_SCK_PIN);
-
-  Serial.println("SPI communication configures");
+  
+  // SD card initialization with retry
   Serial.println("SD card initialization...");
-
-  // Check SD card accessibility
+  
   if (!(SD.begin(SDCARD_CS_PIN))) {
     while (1) {
       Serial.println("Unable to access the SD card");
-      delay(500);
+      displayBinaryCode(3);
+      delay(100);
     }
   } else {
     Serial.println("SD card loaded");
   }
 
-  //help function to init RTC
+  // RTC setup for LONG player only
   if (PLAYER_ID == 0) {
     setupRTC();
-    Serial.println("RTC setup");
-
-    //flag for initialization complete
-    Serial.print("Setup complete! starting playback in ");
+    Serial.println("RTC setup complete");
+    
+    Serial.print("Setup complete! Starting playback in ");
     Serial.print(STARTUP_DELAY / 1000);
     Serial.println("s.");
-
-    //delay(STARTUP_DELAY);  //wait for 2 other units to listen
   } else {
-    //flag for initialization complete
-    Serial.println("Setup complete! waiting for LONG player to playback.");
+    Serial.println("Setup complete! Waiting for LONG player commands.");
   }
   
+  // Reset global state
+  systemAwake = false;
+  playbackStatus = false;
+  trackIteration = 0;
+  
+  //wdt.reset();
+
 }
 
 //start millis thread timer
 elapsedMillis pwmTimer;       // For PWM updates
 elapsedMillis commandTimer;   // For checking commands
 elapsedMillis statusTimer;    // For status updates
-elapsedMillis displayTimer;   // For display updates
-elapsedMillis reportTimer;    // For periodic reporting (optional)
+//elapsedMillis reportTimer;    // For periodic reporting (optional)
 
 //LOOP
 void loop() {
+  //wdt.feed();
+
   if (statusTimer >= 1000) {
     statusUpdates();
     statusTimer = 0;
