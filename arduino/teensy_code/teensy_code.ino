@@ -65,7 +65,6 @@
 #include <RTClib.h>
 #include "LedzCtrl.h"       //custom lib for LEDs array control
 #include "mySysCtrl.h"      //custom lib for system control
-#include <Watchdog_t4.h>
 
 //OBJECTS
 //audio
@@ -76,8 +75,6 @@ AudioOutputI2S audioOutput;
 AudioControlSGTL5000 sgtl5000;
 //RTC
 RTC_DS3231 rtc;
-//watchdog
-WDT_T4<WDT1> wdt;
 
 //AUDIO MATRIX
 AudioConnection patchCord1(wavPlayer, 0, audioOutput, 0);
@@ -219,12 +216,12 @@ elapsedMillis reportTimer;    // For periodic reporting (optional)
 
 //LOOP
 void loop() {
-  if (statusTimer >= 1000) {  // Check status every second
+  if (statusTimer >= 1000) {
     statusUpdates();
     statusTimer = 0;
   }
   
-  if (commandTimer >= 20) {   // Check commands frequently (50Hz)
+  if (commandTimer >= 20) {
     checkUsbCommands();
     commandTimer = 0;
   }
@@ -337,6 +334,7 @@ void follower() {
         case CMD_SLEEP:
           Serial.println("Sleep command received");
           shutDownSequence();
+          Serial.println("System going to sleep");
           break;
   
         case CMD_REPORT:
@@ -393,15 +391,14 @@ void follower() {
           break;
       }
       
-      // Clear buffer more efficiently
+      // Clear buffer
       while (Serial3.available()) {
         Serial3.read();
       }
     }
   }
   
-  // Update display and PWM more frequently
-  if (displayUpdateTimer >= 20) { // 50Hz refresh (more responsive than 25Hz)
+  if (displayUpdateTimer >= 20) {
     displayUpdateTimer = 0;
     
     if (systemAwake) {

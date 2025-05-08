@@ -1,15 +1,15 @@
+#include <ctime>
 #include <cstdlib>
 #include "WireIMXRT.h"
 #include "core_pins.h"
 /**
  * mySysCtrl.h - System Control Library
  * 
- * This library provides functions to manage the system state, player identification,
- * and reporting for the Teensy-based sound-to-light installation.
+ * Functions for system state, timing, player identification, audio playback,
+ * serial communication and system reports.
  * 
- * Created: 2024-04-18
+ * Created: 2025-03-20
  * Author: Antoine "Arthur" Hureau-Parreira
- * 
  * Ant Art Enk, Bergen NO
  */
 
@@ -62,9 +62,9 @@ extern const uint8_t LED_ARRAY[];
 extern float audioVolume;
 extern int rangePWM;
 extern int currentCode;
-//extern int audioMemory;
 extern const int STARTUP_DELAY;
 extern int pwmFreq;
+const int CHECK_INTERVAL = 60000;
 
 #define CMD_LED_1 '1'  // LED 1 control
 #define CMD_LED_2 '2'  // LED 2 control
@@ -82,23 +82,10 @@ extern int pwmFreq;
 #define CMD_PWM_UP '>'  // Increase PWM range
 #define CMD_PWM_DOWN '<' // Decrease PWM range
 
+
 /**
- * Prints the current date and time from the RTC to the Serial monitor
- * 
- * This helper function retrieves the current timestamp from the real-time clock (RTC)
- * and formats it in a human-readable format, then outputs it to the Serial monitor.
- * The output format is: YYYY/MM/DD (DayName) HH:MM:SS
- * 
- * Example output: 2025/04/29 (Tuesday) 14:30:22
- * 
- * Dependencies:
- *   - Requires an initialized RTC object named 'rtc'
- *   - Requires a string array 'days' containing day names indexed by dayOfTheWeek()
- *     (where Sunday=0, Monday=1, etc.)
- *   - Requires the DateTime class from an RTC library (typically RTClib)
- * 
- * This function doesn't take any parameters or return any values.
- * It only outputs the formatted time to Serial.
+ * Prints current date/time from RTC to Serial
+ * Format: YYYY/MM/DD (DayName) HH:MM:SS
  */
 void clockMe() {
   DateTime input = rtc.now();
@@ -119,10 +106,9 @@ void clockMe() {
 }
 
 /**
- * Formats time in milliseconds to a string in the format "mn:s:ms"
- * 
+ * Formats time in milliseconds to "mn:s:ms" string
  * @param ms Time in milliseconds
- * @return String formatted as minutes:seconds:milliseconds
+ * @return Formatted string
  */
 String formatTimeToMinutesSecondsMs(unsigned long ms) {
   // Calculate minutes, seconds, and remaining milliseconds
@@ -131,7 +117,7 @@ String formatTimeToMinutesSecondsMs(unsigned long ms) {
   unsigned long milliseconds = ms % 1000;
   
   // Create the formatted string
-  char buffer[15]; // Enough space for "999:59:999" plus null terminator
+  char buffer[15];
   
   // Add safety check
   if (sprintf(buffer, "%lu:%02lu:%03lu", (unsigned long)minutes, (unsigned long)seconds, (unsigned long)milliseconds) > 0 && strlen(buffer) < sizeof(buffer)) {
@@ -145,23 +131,11 @@ String formatTimeToMinutesSecondsMs(unsigned long ms) {
 }
 
 /**
- * Generates a comprehensive system report to the Serial console
- * 
- * This function outputs detailed information about the current system 
- * configuration, including:
- * - Player ID and configuration
- * - Pin assignments for SD card, digital pins, and analog pins
- * - LED array configuration
- * - System settings (volume, PWM range, audio memory, etc.)
- * - Current system states (awake/sleep, playback, peak mode)
- * - Date/time information
- * - Audio file names
- * 
- * @param player The player ID to include in the report
- * 
- * @note This function is useful for debugging and system verification
+ * Generates system report to Serial console
+ * @param player The player ID for the report
  */
 void systemReport(int player) {
+  //header
   Serial.println("\n----- SYSTEM REPORT -----");
   if (PLAYER_ID == 0){
     Serial.print("RTC time: ");
@@ -259,7 +233,7 @@ void systemReport(int player) {
   Serial.print(pwmFreq);
   Serial.println(" Hz");
 
-  // System states
+  // System state
   Serial.println("\n-- SYSTEM STATES --");
   Serial.print("System Awake: ");
   Serial.println(systemAwake ? "YES" : "NO");
@@ -272,18 +246,11 @@ void systemReport(int player) {
 }
 
 /**
- * Performs a sequenced startup of the amplifier and speaker
- * 
- * This function powers on the system components in the correct order:
- * 1. Turns on the amplifier (REL_1)
- * 2. Waits for REL_SW_DELAY milliseconds
- * 3. Turns on the speaker (REL_2)
- * 4. Waits for REL_SW_DELAY milliseconds
- * 
- * The sequence prevents power surges and potential speaker damage
- * by ensuring the amplifier is powered before the speaker.
+ * Powers on amplifier then speaker with delay, wakes system up
  */
+
 void startupSequence() {
+  //startup only if system is asleep
   if (!systemAwake){
     digitalWrite(REL_1, HIGH);  //turns amp on
     Serial.println("amp is ON");
@@ -291,28 +258,19 @@ void startupSequence() {
     digitalWrite(REL_2, HIGH);  //turns speaker on
     Serial.println("speaker is ON");
     delay(REL_SW_DELAY);
-    systemAwake = true;
+
+    systemAwake = true; //system wakeup
+    trackIteration = 0;
   }
 }
 
 /**
- * Performs a sequenced shutdown of the speaker and amplifier
- * 
- * This function powers off the system components in the correct order,
- * but only if audio is not currently playing:
- * 1. Checks if audio is playing (wavPlayer.isPlaying())
- * 2. If not playing, turns off the speaker (REL_2)
- * 3. Waits for REL_SW_DELAY milliseconds
- * 4. Turns off the amplifier (REL_1)
- * 5. Waits for REL_SW_DELAY milliseconds
- * 
- * The sequence prevents audio cutoff during playback and potential
- * speaker damage by ensuring the speaker is powered off before the amplifier.
- * 
- * @note If audio is currently playing, this function does nothing
+ * Powers off speaker then amplifier with delay, puts system to sleep
  */
 void shutDownSequence() {
+  //shutdown only if system is awake
   if (systemAwake){
+    //stop any audio or light
     wavPlayer.stop();
     digitalWrite(PWM_PIN, LOW);
 
@@ -323,34 +281,17 @@ void shutDownSequence() {
     Serial.println("amp is OFF");
     delay(REL_SW_DELAY);
 
-    systemAwake = false;
+    systemAwake = false; //puts system asleep
   }
 }
 
 /**
- * Plays an audio file and manages playback status and tracking
- * 
- * This function initiates playback of the audio file defined by FILE_NAME constant
- * using the wavPlayer object. It updates the tracking information for the current
- * session, including incrementing the playback iteration counter and setting the
- * playback status flag to true.
- * 
- * The function also provides feedback via Serial output about:
- *  - Which file is being played
- *  - The current iteration number within the session
- *  - A reminder about the daily reset of tracking data
- * 
- * Global variables affected:
- *  - trackIteration: Incremented to count total playbacks in the current session
- *  - playbackStatus: Set to true to indicate active playback
- * 
- * Dependencies:
- *  - Requires a properly initialized wavPlayer object
- *  - Requires the FILE_NAME constant to be defined with a valid audio file path
-*/
+ * Plays audio file and updates tracking data
+ * Increments trackIteration and sets playbackStatus
+ */
 void playAudio() {
   wavPlayer.play(FILE_NAME);
-  delay(50);
+  delay(50); //debounce
   trackIteration += 1;
   playbackStatus = true;
   
@@ -359,26 +300,24 @@ void playAudio() {
   Serial.print("Track iteration nr ");
   Serial.print(trackIteration);
   Serial.println(" during curent session (will be deleted tomorrow morning at 6AM).");
+
+  float temp = tempmonGetTemp();
+  Serial.print("CPU temperature: ");
+  Serial.print(temp);
+  Serial.println(" °C");
+
+  if (PLAYER_ID == 0){
+    clockMe();
+  }
 }
 
 /**
- * Sends a formatted command to a receiving device via Serial3
- * 
- * This function takes a command string and sends it over Serial3 using the
- * required format ":command." (starting with a colon, ending with a period).
- * It automatically adds the required delimiters and appends a newline character
- * after the command for proper command parsing on the receiving end.
- * 
- * The function includes a short delay after sending to prevent command overlap
- * and ensure reliable transmission, especially when multiple commands are sent
- * in quick succession.
- * 
- * @param command The command string to send (without delimiters)
- *                This should be the raw command like "play", "stop", etc.
- *                Delimiters (: and .) will be added automatically
+ * Sends formatted single character commands via Serial3
+ * @param command Character command to send
  */
 void sendSerialCommand(char command) {
   Serial3.write(command);
+
   Serial.print("Command '");
   Serial.print(command);
   Serial.println("' was sent on Serial3");
@@ -386,25 +325,20 @@ void sendSerialCommand(char command) {
 }
 
 /**
- * Updates the system state based on time of day
- * 
- * For the LONG player (PLAYER_ID == 0), this function checks the current time
- * from the RTC and manages the system's awake/sleep state according to the
- * configured START_HOUR and END_HOUR. It handles:
- * - Waking up the system (calling startupSequence()) when entering active hours
- * - Putting the system to sleep (calling shutDownSequence()) when exiting active hours
- * - Resetting track iteration count at the start of a new active period
- * 
- * @note This function has no effect on SMALL or SEASHELL players besides playback status (PLAYER_ID != 0)
+ * Updates system state based on time of day
+ * For LONG player, manages wake/sleep state based on configured hours
+ * For SMALL and SEASHELL, it only controls playback status
  */
 void statusUpdates() {
+  //check static variables
   static unsigned long lastCheck = 0;
   static bool lastActiveState = false;
   static bool initialCheckDone = false;
   
-  // First check happens quickly after startup, then every minute
-  unsigned long checkInterval = initialCheckDone ? 60000 : 5000;
+  // check first 5 seconds after setup, then every minute
+  unsigned long checkInterval = initialCheckDone ? CHECK_INTERVAL : STARTUP_DELAY;
   
+  //if current time minus last check time is greater than interval, it's time to check status
   if (PLAYER_ID == 0 && (millis() - lastCheck > checkInterval)) {
     lastCheck = millis();
     initialCheckDone = true;
@@ -422,21 +356,21 @@ void statusUpdates() {
     Serial.println(END_HOUR);
     */
     
+    //if current time is greater or equal to 6AM and inferior than 11PM, system should be active
     bool isActive = (currentHour >= START_HOUR && currentHour < END_HOUR);
     
-    // Only transition if state has changed
     if (isActive != lastActiveState) {
       lastActiveState = isActive;
       
+      //if system is active but asleep, trigger startup sequence
       if (isActive) {
         if (!systemAwake) {
           Serial.println("Entering active hours");
           sendSerialCommand(CMD_WAKEUP);
           startupSequence();
-          trackIteration = 0;
           displayBinaryCode(15);
         }
-      } else {
+      } else { //if system is inactive but awake, trigger shutdown sequence
         if (systemAwake) {
           Serial.println("Exiting active hours");
           sendSerialCommand(CMD_SLEEP);
@@ -453,25 +387,15 @@ void statusUpdates() {
 }
 
 /**
- * Identifies the player type and sets up related configuration
- * 
- * This function determines which player type the device is (LONG, SMALL, or SEASHELL)
- * by checking specific input pins. Based on the identified player type, it:
- * - Sets the PLAYER_ID value (0=LONG, 1=SMALL, 2=SEASHELL)
- * - Configures the correct audio file name for the player type
- * 
- * @note This function should be called during system initialization
- * 
- * Pin-to-player mapping:
- * - HIGH on LONG_PIN (pin 32) for LONG player (ID 0)
- * - HIGH on SMALL_PIN (pin 30) for SMALL player (ID 1)
- * - HIGH on SEASHELL_PIN (pin 28) for SEASHELL player (ID 2)
+ * Identifies player type and sets configuration
+ * Sets PLAYER_ID (0=LONG, 1=SMALL, 2=SEASHELL) and audio file
  */
 void setupPlayerID() {
   pinMode(SMALL_PIN, INPUT);
   pinMode(SEASHELL_PIN, INPUT);
   pinMode(LONG_PIN, INPUT);
 
+  //read pin to define player ID
   if (digitalRead(LONG_PIN) == HIGH) {
     PLAYER_ID = 0;
   } else if (digitalRead(SMALL_PIN) == HIGH) {
@@ -483,6 +407,7 @@ void setupPlayerID() {
   Serial.print("Player ID is  ");
   Serial.println(PLAYER_ID);
 
+  //match file name according to player ID
   if (PLAYER_ID == 0) {
     strcpy(FILE_NAME, LO_STR);
   } else if (PLAYER_ID == 1) {
@@ -497,9 +422,8 @@ void setupPlayerID() {
 
 /**
  * Processes single-character commands
- * 
- * @param cmd The command character to process
- * @return True if command was processed successfully
+ * @param cmd Command character
+ * @return True if command processed successfully
  */
 bool processCommand(char cmd) {
   switch(cmd) {
@@ -621,14 +545,11 @@ bool processCommand(char cmd) {
       return false;
   }
   
-  // Add a return statement at the end to avoid warning
   return false;
 }
 
 /**
- * Processes commands from USB Serial interface (Serial monitor)
- * Simplified for single-character command handling
- * 
+ * Processes commands from USB Serial
  * @return True if command was processed
  */
 bool checkUsbCommands() {
@@ -669,12 +590,13 @@ bool checkUsbCommands() {
         case CMD_PWM_DOWN:
           // Valid command - process it
           commandProcessed = processCommand(inChar);
+          break;
           
         default:
           // Invalid command
-          //Serial.print("Unknown command: '");
-          //Serial.print(inChar);
-          //Serial.println("'");
+          Serial.print("Unknown command: '");
+          Serial.print(inChar);
+          Serial.println("'");
           break;
       }
     }
