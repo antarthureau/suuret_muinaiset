@@ -119,6 +119,10 @@ int pwmFreq = 25;   //Hz, refresh rate for the PWM
 const int REL_SW_DELAY = 500;
 bool systemAwake = false;  //activity time between START_HOUR and END_HOUR
 bool playbackStatus = false;
+bool messageIncoming = false;
+const int MSG_BUFFER_SIZE = 64;
+char messageBuffer[MSG_BUFFER_SIZE];
+const int UPDATE_RATE = 20;
 const bool PEAK_MODE = true;  //Switch between peak or rms mode
 const char days[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 const char SM_STR[13] = "SMALL.WAV";
@@ -127,22 +131,6 @@ const char LO_STR[13] = "LONG.WAV";
 char FILE_NAME[13];
 int PLAYER_ID;
 
-//commands (on USB serial and Serial3) 
-#define CMD_LED_1 '1'  // LED 1 control
-#define CMD_LED_2 '2'  // LED 2 control
-#define CMD_LED_3 '3'  // LED 3 control
-#define CMD_LED_4 '4'  // LED 4 control
-#define CMD_HELP 'h'   // Display help
-#define CMD_WAKEUP 'w' // Wake up system
-#define CMD_PLAY 'p'   // Play audio
-#define CMD_SLEEP 's'  // Sleep system
-#define CMD_STOP '!'   // Stop audio
-#define CMD_REPLAY 'z' // Reset and replay audio
-#define CMD_REPORT 'r' // Generate system report
-#define CMD_VOL_UP '+'  // Increase volume
-#define CMD_VOL_DOWN '-' // Decrease volume
-#define CMD_PWM_UP '>'  // Increase PWM range
-#define CMD_PWM_DOWN '<' // Decrease PWM range
 
 //SETUP
 void setup() {
@@ -234,7 +222,6 @@ void setup() {
   trackIteration = 0;
   
   //wdt.reset();
-
 }
 
 //start millis thread timer
@@ -251,10 +238,17 @@ void loop() {
     statusUpdates();
     statusTimer = 0;
   }
-  
-  if (commandTimer >= 20) {
-    checkUsbCommands();
-    commandTimer = 0;
+
+  if (Serial.available()) {
+    // Check if it starts with ':' (a message)
+    if (Serial.peek() == ':') {
+      checkUsbMessages();
+      commandTimer = 0;
+    } else {
+      // Not a message, process as command
+      checkUsbCommands();
+      commandTimer = 0;
+    }
   }
 
   //LO player
@@ -272,22 +266,25 @@ void loop() {
 
 
 //###########################################################################
-//helper function to setup the RTC module (adafruit documentation, details in "Examples > RTClib")
+//helper function to setup the RTC module - always updates time when connected via USB
 void setupRTC() {
-  /*
-  #ifndef ESP8266
-    while (!Serial); // wait for serial port to connect. Needed for native USB
-  #endif
-  */
-
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
     while (1) delay(10);
   }
 
-  if (rtc.lostPower()) {
-    Serial.println("RTC lost power, let's set the time!");
+  // Always update the time when connected via USB
+  if (Serial) {
+    // Time will be set based on when the code was compiled
+    Serial.println("USB connected - updating RTC time from compilation timestamp");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    
+    // Display the new time
+    clockMe();
+  } else if (rtc.lostPower()) {
+    // Still update if power was lost, even if USB is not connected
+    Serial.println("RTC lost power, setting time from compile timestamp");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 }
@@ -318,108 +315,72 @@ void writeOutPWM(uint8_t pin) {
 
 void leader() {
   static elapsedMillis playbackTimer;
+  static elapsedMillis updateTimer;
+  static elapsedMillis serialCheckTimer;
   const unsigned long RETRY_INTERVAL = 5000;
   
-  if (systemAwake) {
-    if (!wavPlayer.isPlaying() && playbackTimer >= RETRY_INTERVAL) {
-      playbackTimer = 0;
-      sendSerialCommand(CMD_PLAY);
-      playAudio();
-    }
+  // Check for playback (every 5 seconds)
+  if (systemAwake && !wavPlayer.isPlaying() && playbackTimer >= RETRY_INTERVAL) {
+    playbackTimer = 0;
+    sendSerialCommand(CMD_PLAY);
+    playAudio();
+  }
 
-    if (wavPlayer.isPlaying()) {
-      writeOutPWM(PWM_PIN);
-      displayBinaryCode(8);
+  // Check for responses from followers
+  if (serialCheckTimer >= 10) {  // Check every 10ms
+    serialCheckTimer = 0;
+    
+    if (Serial3.available()) {
+      // Check if it's a message starting with ':'
+      if (Serial3.peek() == ':') {
+        receiveSerialMessage();  // Process the incoming message from follower
+      } else {
+        // Clear any other characters
+        while (Serial3.available()) {
+          Serial3.read();
+        }
+      }
+    }
+  }
+  
+  // Update display and PWM output
+  if (updateTimer >= UPDATE_RATE) {
+    updateTimer = 0;
+    if (systemAwake) {
+      if (wavPlayer.isPlaying()) {
+        writeOutPWM(PWM_PIN);
+        displayBinaryCode(8);
+      } else {
+        displayBinaryCode(2);
+        digitalWrite(PWM_PIN, LOW);
+      }
     } else {
-      displayBinaryCode(2);
+      // System is asleep
+      if (wavPlayer.isPlaying()) {
+        wavPlayer.stop();
+      }
+      displayBinaryCode(1);
       digitalWrite(PWM_PIN, LOW);
     }
-  } else {
-    // System is asleep
-    if (wavPlayer.isPlaying()) {
-      wavPlayer.stop();
-    }
-    displayBinaryCode(1);
-    digitalWrite(PWM_PIN, LOW);
   }
 }
 
 void follower() {
   static elapsedMillis commandCheckTimer;
-  static elapsedMillis displayUpdateTimer;
+  static elapsedMillis updateTimer;
   
-  // Check for commands more frequently
-  if (commandCheckTimer >= 10) { // 100Hz command checking
+  // Check for commands frequently
+  if (commandCheckTimer >= 10) {
     commandCheckTimer = 0;
     
     if (Serial3.available()) {
-      char inChar = (char)Serial3.read();
-      
-      // Process commands immediately
-      switch(inChar) {
-        case CMD_WAKEUP:
-          Serial.println("Wake command received");
-          startupSequence();
-          break;
-        
-        case CMD_SLEEP:
-          Serial.println("Sleep command received");
-          shutDownSequence();
-          Serial.println("System going to sleep");
-          break;
-  
-        case CMD_REPORT:
-          Serial.println("Report command received");
-          systemReport(PLAYER_ID);
-          break;
-          
-        case CMD_PLAY:
-          if (systemAwake) {
-            Serial.println("Play command received");
-            playAudio();
-          }
-          break;
-          
-        case CMD_STOP: // Stop
-          Serial.println("Stop command received");
-          wavPlayer.stop();
-          break;
-
-        case CMD_REPLAY: // Stop
-          Serial.println("Replay command received");
-          wavPlayer.stop();
-          playAudio();
-          break;
-          
-        case CMD_VOL_UP: // Volume up
-          audioVolume += 0.1f;
-          if (audioVolume > 1.0f) audioVolume = 1.0f;
-          sgtl5000.volume(audioVolume);
-          Serial.print("Volume increased to: ");
-          Serial.println(audioVolume);
-          break;
-          
-        case CMD_VOL_DOWN: // Volume down
-          audioVolume -= 0.1f;
-          if (audioVolume < 0.0f) audioVolume = 0.0f;
-          sgtl5000.volume(audioVolume);
-          Serial.print("Volume decreased to: ");
-          Serial.println(audioVolume);
-          break;
-          
-        case CMD_PWM_UP: // PWM range up
-          rangePWM += 25; // Increase by ~10% of max (255)
-          if (rangePWM > 255) rangePWM = 255;
-          Serial.print("PWM range increased to: ");
-          Serial.println(rangePWM);
-          break;
-          
-        case CMD_PWM_DOWN: // PWM range down
-          rangePWM -= 25; // Decrease by ~10% of max (255)
-          if (rangePWM < 0) rangePWM = 0;
-          Serial.print("PWM range decreased to: ");
-          Serial.println(rangePWM);
-          break;
+      // Check if this is a message (starts with ':')
+      if (Serial3.peek() == ':') {
+        receiveSerialMessage();
+      } else {
+        // Process as a single command
+        char inChar = (char)Serial3.read();
+        processCommand(inChar);
       }
       
       // Clear buffer
@@ -428,9 +389,10 @@ void follower() {
       }
     }
   }
-  
-  if (displayUpdateTimer >= 20) {
-    displayUpdateTimer = 0;
+
+  // Update display and PWM output
+  if (updateTimer >= UPDATE_RATE) {
+    updateTimer = 0;
     
     if (systemAwake) {
       if (wavPlayer.isPlaying()) {
