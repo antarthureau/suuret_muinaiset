@@ -84,7 +84,9 @@ const int CHECK_INTERVAL = 60000;
 #define CMD_VOL_DOWN '-' // Decrease volume
 #define CMD_PWM_UP '>'  // Increase PWM range
 #define CMD_PWM_DOWN '<' // Decrease PWM range
-#define CMD_REQUEST_STATUS '?' // Request status from followers
+#define MSG_REQUEST_SMALL "small"
+#define MSG_REQUEST_SEASHELL "seashell"
+#define MSG_HELP ":help"
 
 /**
  * Identifies player type and sets configuration
@@ -419,39 +421,24 @@ bool processCommand(char cmd) {
   switch(cmd) {
     case CMD_HELP:
       Serial.println("\n----- AVAILABLE COMMANDS -----");
-      Serial.println("h - Display this help message");
-      Serial.println("r - Generate system report");
-      Serial.println("w - Wake up system");
-      Serial.println("s - Put system to sleep");
-      Serial.println("p - Play audio");
-      Serial.println("! - Stop audio");
-      Serial.println("z - Replay audio");
-      Serial.println("+ - Increase volume");
-      Serial.println("- - Decrease volume");
-      Serial.println("> - Increase PWM range");
-      Serial.println("< - Decrease PWM range");
-      Serial.println("1-4 - Toggle individual LEDs");
+      Serial.println("h - :help Display this help message");
+      Serial.println("r - :report Generate system report");
+      Serial.println("w - :wakeup Wake up system");
+      Serial.println("s - :sleep Put system to sleep");
+      Serial.println("p - :play Play audio");
+      Serial.println("! - :stop Stop audio");
+      Serial.println("z - :replay Replay audio");
+      Serial.println("+ - :volup Increase volume");
+      Serial.println("- - :voldown Decrease volume");
+      Serial.println("> - :pwmupIncrease PWM range");
+      Serial.println("< - :pwmdown Decrease PWM range");
+      Serial.println("1-4 - :ledx Toggle individual LEDs");
       Serial.println("------------------------------\n");
       return true;
       
     case CMD_REPORT:
       Serial.println("Generating system report...");
       systemReport(PLAYER_ID);
-      return true;
-
-    case CMD_REQUEST_STATUS:
-      if(PLAYER_ID == 0){
-        Serial.println("Requesting status from followers...");
-        sendSerialCommand(CMD_REQUEST_STATUS);
-      } else {
-        // Add a delay based on PLAYER_ID to stagger responses
-        int delayTime = PLAYER_ID * 1500; // 1.5 seconds between follower responses
-        Serial.print("Status request received from leader. Responding in ");
-        Serial.print(delayTime);
-        Serial.println(" ms");
-        delay(delayTime);
-        sendStatusToLeader();
-      }
       return true;
       
     case CMD_WAKEUP:
@@ -580,6 +567,38 @@ bool processMessage(char* msg) {
     Serial.println("Report command received via message");
     processCommand(CMD_REPORT);
     return true;
+  }
+
+  else if (strcmp(content, MSG_REQUEST_SEASHELL) == 0) {
+    if (PLAYER_ID == 2) {
+      // This player (seashell) should respond
+      Serial.println("Report command for seashell received via message");
+      delay(10);
+      sendStatusToLeader();
+      return true;
+    } else if (PLAYER_ID == 1) {
+      // This player (small) should not respond - temporarily disable Serial3
+      Serial3.end();  // Disable the serial port
+      delay(250);     // Give time for the other player to respond
+      Serial3.begin(9600);  // Re-enable with same baud rate
+      return true;
+    }
+  }
+
+  else if (strcmp(content, MSG_REQUEST_SMALL) == 0) {
+    if (PLAYER_ID == 1) {
+      // This player (small) should respond
+      Serial.println("Report command for small received via message");
+      delay(10);
+      sendStatusToLeader();
+      return true;
+    } else if (PLAYER_ID == 2) {
+      // This player (seashell) should not respond - temporarily disable Serial3
+      Serial3.end();  // Disable the serial port
+      delay(250);     // Give time for the other player to respond
+      Serial3.begin(9600);  // Re-enable with same baud rate
+      return true;
+    }
   }
 
   else if (strncmp(content, "STATUS|", 7) == 0) {
@@ -806,7 +825,6 @@ bool checkUsbCommands() {
         case CMD_VOL_DOWN:
         case CMD_PWM_UP:
         case CMD_PWM_DOWN:
-        case CMD_REQUEST_STATUS:
           // Valid command - process it
           commandProcessed = processCommand(inChar);
           break;

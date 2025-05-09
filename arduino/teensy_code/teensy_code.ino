@@ -120,7 +120,7 @@ const int REL_SW_DELAY = 500;
 bool systemAwake = false;  //activity time between START_HOUR and END_HOUR
 bool playbackStatus = false;
 bool messageIncoming = false;
-const int MSG_BUFFER_SIZE = 64;
+const int MSG_BUFFER_SIZE = 512;
 char messageBuffer[MSG_BUFFER_SIZE];
 const int UPDATE_RATE = 20;
 const bool PEAK_MODE = true;  //Switch between peak or rms mode
