@@ -318,29 +318,6 @@ void shutDownSequence() {
   }
 }
 
-void scheduledReboot() {
-  // Log reboot event
-  Serial.println("Performing scheduled system reboot");
-
-  //forward reboot command to followers
-  if (PLAYER_ID == 0){
-    sendSerialCommand(CMD_REBOOT);
-    delay(50);
-  }
-  
-  // if system is awake shut it down
-  if (systemAwake) {
-    shutDownSequence();
-  }
-
-  //display reboot code and wait 5sec
-  displayBinaryCode(7);
-  delay(STARTUP_DELAY);
-  
-  //reboot
-  SCB_AIRCR = 0x05FA0004;
-}
-
 /**
  * Plays audio file and updates tracking data
  * Increments trackIteration and sets playbackStatus
@@ -427,6 +404,29 @@ void sendStatusToLeader() {
   
   Serial.print("Sent status to leader: ");
   Serial.println(statusMsg);
+}
+
+void scheduledReboot() {
+  // Log reboot event
+  Serial.println("Performing scheduled system reboot");
+
+  //forward reboot command to followers
+  if (PLAYER_ID == 0){
+    sendSerialCommand(CMD_REBOOT);
+    delay(50);
+  }
+  
+  // if system is awake shut it down
+  if (systemAwake) {
+    shutDownSequence();
+  }
+
+  //display reboot code and wait 5sec
+  displayBinaryCode(7);
+  delay(STARTUP_DELAY);
+  
+  //reboot
+  SCB_AIRCR = 0x05FA0004;
 }
 
 /**
@@ -591,7 +591,7 @@ bool processMessage(char* msg) {
     return true;
   }
 
-  else if (strcmp(content, MSG_REQUEST_SEASHELL) == 0) {
+  else if (strcmp(content, "seashell") == 0) {
     if (PLAYER_ID == 2) {
       // This player (seashell) should respond
       Serial.println("Report command for seashell received via message");
@@ -607,7 +607,7 @@ bool processMessage(char* msg) {
     }
   }
 
-  else if (strcmp(content, MSG_REQUEST_SMALL) == 0) {
+  else if (strcmp(content, "small") == 0) {
     if (PLAYER_ID == 1) {
       // This player (small) should respond
       Serial.println("Report command for small received via message");
@@ -837,6 +837,7 @@ bool checkUsbCommands() {
         case CMD_LED_4:
         case CMD_HELP:
         case CMD_WAKEUP:
+        case CMD_REBOOT:
         case CMD_PLAY:
         case CMD_SLEEP:
         case CMD_STOP:
