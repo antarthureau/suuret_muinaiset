@@ -2,11 +2,6 @@
  * ledzCtrl.h
  * 
  * This library provides functions to control a 4-LED binary display (4 LEDs array) for displaying status codes (0-15)
- * 
- * Created: 2024-04-18
- * Author: Antoine "Arthur" Hureau-Parreira
- * 
- * Ant Art Enk, Bergen NO
  */
 
 #ifndef LEDZCTRL_H

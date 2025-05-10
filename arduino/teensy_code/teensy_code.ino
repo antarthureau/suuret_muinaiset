@@ -1,59 +1,8 @@
 /*
-  Sound to light system. Audio playback outputs audio RMS or peak values to PWM output, driving LED strip.
-  3 players: 1 leader (LO short for LONG) has an RTC module and control 2 followers through Serial3 (SM for SMALL and SS for SEASHELL)
-
-  PINS:
-    0 x (must be NC, used for USB Serial)
-    1 x (must be NC, used for USB Serial)
-    2 LED_1
-    3 LED_2
-    4 LED_3
-    5 LED_4
-    6 PWM_OUT (LED strip control)
-    7 x (can be used as receiver for Serial2)
-    8 x (can be used as transmitter for Serial2)
-    9 x
-    10 SDCARD_CS_PIN (SD card)
-    11 SDCARD_MOSI_PIN (SD card)
-    12 x
-    13 SDCARD_SCK_PIN (SD card)
-    14 RX3 (receive serial on SM/SS, x on LO)
-    15 TX3 (send serial on LO, x on SM/SS)
-    16 REL_2 (relay speaker)
-    17 REL_1 (relay PSU/amp)
-    18 SDA0 (RTC on LO, x on SM/SS)
-    19 SCL0 (RTC on LO, x on SM/SS)
-    20 LRCLK1 (audio)
-    21 BCLK1 (audio)
-    22 VOL_CTRL_PIN (analog volume ctrl)
-    23 MCLK (audio)
-    28 PLAYED_ID (2, SS)
-    30 PLAYER_ID (1, SM)
-    32 PLAYER_ID (0, LO)
-
-  CODES:
-    0 x
-    1 asleep
-    2 awake
-    3 unable to access SD
-    4 SGTL not found
-    5
-    6
-    7 system reboot in 5seconds
-    8 audio playback
-    9
-    10
-    11
-    12
-    13 SGTL5000 not found
-    14
-    15
-
-  created 21.08.2024
-  by Antoine "Arthur" Hureau-Parreira
-  Ant Art Enk, Bergen NO
-
-  This code relies on open-source technology and references and belongs to the public domain.
+  Sound to light system for installation Suuret Muinaiset in Turku, Finland.
+  Mono audio playback outputs audio RMS or peak values to PWM output, driving LED strip through a MOSFET.
+  3 players in action: 1 leader (LO short for LONG) has an RTC module and control 2 followers through Serial3 (SM for SMALL and SS for SEASHELL)
+  The whole system can be controlled via USB serial commands or messages sent from the leader to the followers.
 */
 
 #include <Audio.h>
@@ -301,7 +250,7 @@ void setupRTC() {
  * @peak: TRUE for peak mode, FALSE for RMS mode.
  */
 void writeOutPWM(uint8_t pin) {
-  if (pwmTimer >= pwmFreq) {
+  if (pwmTimer >= (unsigned long)pwmFreq) {
     pwmTimer = 0;  // Reset timer
     
     // Simplified peak/RMS handling

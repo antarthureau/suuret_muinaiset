@@ -2,11 +2,7 @@
  * mySysCtrl.h - System Control Library
  * 
  * Functions for system state, timing, player identification, audio playback,
- * serial communication and system reports.
- * 
- * Created: 2025-03-20
- * Author: Antoine "Arthur" Hureau-Parreira
- * Ant Art Enk, Bergen NO
+ * serial communication and system reboot and reports.
  */
 
 #ifndef MYSYSCTRL_H
@@ -397,7 +393,7 @@ void sendStatusToLeader() {
           playbackStatus ? 1 : 0, // Playback status
           positionMs,             // Current position in ms
           lengthMs                // Total length in ms
-         );
+        );
   
   // Send the status message to leader
   Serial3.println(statusMsg);
@@ -406,6 +402,10 @@ void sendStatusToLeader() {
   Serial.println(statusMsg);
 }
 
+/**
+ * Schedules a system reboot
+ * This function is called when a reboot command is received
+ */
 void scheduledReboot() {
   // Log reboot event
   Serial.println("Performing scheduled system reboot");
@@ -761,6 +761,8 @@ bool processMessage(char* msg) {
     Serial.println("Type ':help' for available messages");
     return false;
   }
+
+  return false;
 }
 
 /**
@@ -869,6 +871,10 @@ bool checkUsbCommands() {
   return commandProcessed;
 }
 
+/**
+ * Processes messages from USB Serial
+ * @return True if message was processed
+ */
 bool checkUsbMessages() {
   memset(messageBuffer, 0, MSG_BUFFER_SIZE);
   bool messageProcessed = false;
