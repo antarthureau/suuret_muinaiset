@@ -73,13 +73,13 @@ const int CHECK_INTERVAL = 60000;
 #define CMD_LED_2 '2'  // LED 2 control
 #define CMD_LED_3 '3'  // LED 3 control
 #define CMD_LED_4 '4'  // LED 4 control
-#define CMD_HELP 'h'   // Display help
-#define CMD_WAKEUP 'w' // Wake up system
-#define CMD_PLAY 'p'   // Play audio
-#define CMD_SLEEP 's'  // Sleep system
+#define CMD_HELP 'H'   // Display help
+#define CMD_WAKEUP 'W' // Wake up system
+#define CMD_PLAY 'P'   // Play audio
+#define CMD_SLEEP 'S'  // Sleep system
 #define CMD_STOP '!'   // Stop audio
-#define CMD_REPLAY 'z' // Reset and replay audio
-#define CMD_REPORT 'r' // Generate system report
+#define CMD_REPLAY 'Z' // Reset and replay audio
+#define CMD_REPORT 'R' // Generate system report
 #define CMD_VOL_UP '+'  // Increase volume
 #define CMD_VOL_DOWN '-' // Decrease volume
 #define CMD_PWM_UP '>'  // Increase PWM range
@@ -421,13 +421,13 @@ bool processCommand(char cmd) {
   switch(cmd) {
     case CMD_HELP:
       Serial.println("\n----- AVAILABLE COMMANDS -----");
-      Serial.println("h - :help Display this help message");
-      Serial.println("r - :report Generate system report");
-      Serial.println("w - :wakeup Wake up system");
-      Serial.println("s - :sleep Put system to sleep");
-      Serial.println("p - :play Play audio");
+      Serial.println("H - :help Display this help message");
+      Serial.println("R - :report Generate system report");
+      Serial.println("W - :wakeup Wake up system");
+      Serial.println("S - :sleep Put system to sleep");
+      Serial.println("P - :play Play audio");
       Serial.println("! - :stop Stop audio");
-      Serial.println("z - :replay Replay audio");
+      Serial.println("Z - :replay Replay audio");
       Serial.println("+ - :volup Increase volume");
       Serial.println("- - :voldown Decrease volume");
       Serial.println("> - :pwmupIncrease PWM range");
