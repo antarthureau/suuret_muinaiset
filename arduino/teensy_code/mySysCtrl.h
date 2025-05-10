@@ -1,7 +1,3 @@
-#include <ctime>
-#include <cstdlib>
-#include "WireIMXRT.h"
-#include "core_pins.h"
 /**
  * mySysCtrl.h - System Control Library
  * 
@@ -311,7 +307,7 @@ void shutDownSequence() {
   if (systemAwake){
     //stop any audio or light
     wavPlayer.stop();
-    digitalWrite(PWM_PIN, LOW);
+    analogWrite(PWM_PIN, 0);  // Set PWM to zero
 
     digitalWrite(REL_2, LOW);  //turns speaker off
     Serial.println("speaker is OFF");
@@ -754,7 +750,6 @@ void receiveSerialMessage() {
   messageBuffer[index++] = (char)Serial3.read();
   
   // Read until end of message or buffer is full
-  unsigned long startTime = millis();
   bool messageComplete = false;
   
   while (!messageComplete && index < MSG_BUFFER_SIZE - 1 && Serial3.available()) {

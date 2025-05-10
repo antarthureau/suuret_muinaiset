@@ -353,7 +353,7 @@ void leader() {
         displayBinaryCode(8);
       } else {
         displayBinaryCode(2);
-        analogWrite(PWM_PIN, 0);  // Set PWM to zero
+        digitalWrite(PWM_PIN, LOW);
       }
     } else {
       // System is asleep
@@ -361,7 +361,7 @@ void leader() {
         wavPlayer.stop();
       }
       displayBinaryCode(1);
-      analogWrite(PWM_PIN, 0);  // Set PWM to zero
+      digitalWrite(PWM_PIN, LOW);
     }
   }
 }
@@ -401,14 +401,14 @@ void follower() {
         displayBinaryCode(8);
       } else {
         displayBinaryCode(2);
-        analogWrite(PWM_PIN, 0);  // Set PWM to zero
+        digitalWrite(PWM_PIN, LOW);
       }
     } else {
       if (wavPlayer.isPlaying()) {
         wavPlayer.stop();
       }
       displayBinaryCode(1);
-      analogWrite(PWM_PIN, 0);  // Set PWM to zero
+      digitalWrite(PWM_PIN, LOW);
     }
   }
 }

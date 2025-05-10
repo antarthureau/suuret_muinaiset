@@ -1,5 +1,5 @@
 /**
- * ledzCtrl.h - LEDs array control library
+ * ledzCtrl.h
  * 
  * This library provides functions to control a 4-LED binary display (4 LEDs array) for displaying status codes (0-15)
  * 
