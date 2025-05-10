@@ -39,7 +39,7 @@
     4 SGTL not found
     5
     6
-    7
+    7 system reboot in 5seconds
     8 audio playback
     9
     10
@@ -270,8 +270,8 @@ void loop() {
   delay(5);
 }
 //###########################################################################
-// HELPERS
-//
+//#######                          HELPERS                            #######
+//###########################################################################
 //helper function to setup the RTC module - always updates time when connected via USB
 void setupRTC() {
   if (!rtc.begin()) {

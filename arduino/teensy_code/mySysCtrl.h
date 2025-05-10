@@ -80,11 +80,9 @@ const int CHECK_INTERVAL = 60000;
 #define CMD_VOL_DOWN '-' // Decrease volume
 #define CMD_PWM_UP '>'  // Increase PWM range
 #define CMD_PWM_DOWN '<' // Decrease PWM range
-#define MSG_REQUEST_SMALL "small"
-#define MSG_REQUEST_SEASHELL "seashell"
-#define MSG_HELP ":help"
+#define CMD_REBOOT 'B'  // Reboot system
 
-/**
+/*
  * Identifies player type and sets configuration
  * Sets PLAYER_ID (0=LONG, 1=SMALL, 2=SEASHELL) and audio file
  */
@@ -320,6 +318,29 @@ void shutDownSequence() {
   }
 }
 
+void scheduledReboot() {
+  // Log reboot event
+  Serial.println("Performing scheduled system reboot");
+
+  //forward reboot command to followers
+  if (PLAYER_ID == 0){
+    sendSerialCommand(CMD_REBOOT);
+    delay(50);
+  }
+  
+  // if system is awake shut it down
+  if (systemAwake) {
+    shutDownSequence();
+  }
+
+  //display reboot code and wait 5sec
+  displayBinaryCode(7);
+  delay(STARTUP_DELAY);
+  
+  //reboot
+  SCB_AIRCR = 0x05FA0004;
+}
+
 /**
  * Plays audio file and updates tracking data
  * Increments trackIteration and sets playbackStatus
@@ -449,6 +470,11 @@ bool processCommand(char cmd) {
         shutDownSequence();
         Serial.println("System going to sleep");
       }
+      return true;
+    
+    case CMD_REBOOT:
+      Serial.println("Reboot command received");
+      scheduledReboot();
       return true;
       
     case CMD_PLAY:
@@ -965,6 +991,12 @@ void statusUpdates() {
           shutDownSequence();
         }
       }
+    }
+
+    //software reboot every sunday midnight / monday 00:00
+    if (now.dayOfTheWeek() == 0 && now.hour() == 0 && now.minute() == 0) {
+      Serial.println("Weekly reboot time reached");
+      scheduledReboot();
     }
   }
   
