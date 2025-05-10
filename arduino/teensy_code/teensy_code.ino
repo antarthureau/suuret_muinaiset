@@ -34,20 +34,20 @@
   CODES:
     0 x
     1 asleep
-    2 awake and not playing
+    2 awake
     3 unable to access SD
-    4
+    4 SGTL not found
     5
     6
     7
-    8 playing audio
+    8 audio playback
     9
     10
     11
     12
     13 SGTL5000 not found
     14
-    15 awake
+    15
 
   created 21.08.2024
   by Antoine "Arthur" Hureau-Parreira
@@ -108,10 +108,10 @@ const uint8_t VOL_CTRL_PIN = A8;
 const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 
 //SYSTEM
-float audioVolume = 0.3;  //0-1, controls loudness
+float audioVolume = 0.8;  //0-1, controls loudness
 int rangePWM = 255;       //0-255, controls brightness
 int currentCode = 0;      //starts at 0
-const int STARTUP_DELAY = 5000;   //inactivity time after setup for LONG player
+const int STARTUP_DELAY = 10000;   //inactivity time after setup for LONG player
 int trackIteration = 0;    //resets every day at START_HOUR
 const int START_HOUR = 6;  //daily wake-up time
 const int END_HOUR = 23;   //daily sleep time
@@ -130,6 +130,11 @@ const char SS_STR[13] = "SEASHELL.WAV";
 const char LO_STR[13] = "LONG.WAV";
 char FILE_NAME[13];
 int PLAYER_ID;
+
+#define SGTL_ERR_CODE 4
+#define PLAYBACK_CODE
+#define AWAKE_CODE
+#define SD_ERR_CODE
 
 //###########################################################################
 // SETUP AND LOOP
@@ -241,7 +246,7 @@ void loop() {
   }
 
   if (Serial.available()) {
-    // Check if it starts with ':' (a message)
+    // Check for ':' (=message)
     if (Serial.peek() == ':') {
       checkUsbMessages();
       commandTimer = 0;
@@ -318,7 +323,7 @@ void leader() {
   static elapsedMillis playbackTimer;
   static elapsedMillis updateTimer;
   static elapsedMillis serialCheckTimer;
-  const unsigned long RETRY_INTERVAL = 5000;
+  const unsigned long RETRY_INTERVAL = STARTUP_DELAY;
   
   // Check for playback (every 5 seconds)
   if (systemAwake && !wavPlayer.isPlaying() && playbackTimer >= RETRY_INTERVAL) {
