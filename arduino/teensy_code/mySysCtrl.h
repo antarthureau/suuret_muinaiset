@@ -20,6 +20,7 @@ extern int trackIteration;       // Track play count for current day
 extern bool messageIncoming;
 extern const int MSG_BUFFER_SIZE;
 extern char messageBuffer[];
+extern bool knobCtrl;
 
 // Hardware
 extern RTC_DS3231 rtc;           // RTC module reference
@@ -77,6 +78,7 @@ const int CHECK_INTERVAL = 60000;
 #define CMD_PWM_UP '>'  // Increase PWM range
 #define CMD_PWM_DOWN '<' // Decrease PWM range
 #define CMD_REBOOT 'B'  // Reboot system
+#define CMD_KNOB_CTRL 'K' //toggles extern analog mode
 
 /*
  * Identifies player type and sets configuration
@@ -364,6 +366,54 @@ void sendSerialMessage(char* message){
 }
 
 /**
+ * Reads the analog volume control pin and updates audio volume in 10 discrete steps.
+ * Volume is quantized to 0.0, 0.1, 0.2, ... 1.0 only.
+ * Rate-limited to prevent flooding the serial connection.
+ */
+void volumeControl() {
+  static unsigned long lastUpdateTime = 0;
+  static unsigned long lastSendTime = 0;
+  static float lastSentValue = -1.0; // Initialize to impossible value
+  
+  // Limit updates to once every 50ms
+  unsigned long currentTime = millis();
+  if (currentTime - lastUpdateTime < 50) {
+    return;
+  }
+  lastUpdateTime = currentTime;
+  
+  // Read current value (0-1023 from analogRead)
+  float rawValue = analogRead(VOL_CTRL_PIN) / 1024.0;
+  
+  // Quantize to 10 discrete steps (0.0, 0.1, 0.2, ... 1.0)
+  // This automatically eliminates noise and small variations
+  float quantizedValue = round(rawValue * 10.0) / 10.0;
+  
+  // Only update if the quantized value is different from current volume
+  if (quantizedValue != audioVolume) {
+    // Update audio volume
+    audioVolume = quantizedValue;
+    sgtl5000.volume(audioVolume);
+    
+    // Print change to serial
+    Serial.print("Volume set to ");
+    Serial.println(audioVolume);
+    
+    // Forward to other players if this is the leader, but rate limit to once per 500ms
+    if (PLAYER_ID == 0 && 
+        (currentTime - lastSendTime > 500 || quantizedValue != lastSentValue)) {
+      
+      char volumeMsg[20];
+      snprintf(volumeMsg, sizeof(volumeMsg), "volume %.1f", audioVolume);
+      sendSerialMessage(volumeMsg);
+      
+      lastSendTime = currentTime;
+      lastSentValue = quantizedValue;
+    }
+  }
+}
+
+/**
  * Sends status information back to the leader via Serial3
  * Only used by followers (PLAYER_ID != 0)
  */
@@ -408,7 +458,7 @@ void sendStatusToLeader() {
  */
 void scheduledReboot() {
   // Log reboot event
-  Serial.println("Performing scheduled system reboot");
+  Serial.println("Performing scheduled system reboot. System will reboot in 10s.");
 
   //forward reboot command to followers
   if (PLAYER_ID == 0){
@@ -440,13 +490,16 @@ bool processCommand(char cmd) {
       Serial.println("\n----- AVAILABLE COMMANDS -----");
       Serial.println("H - :help Display this help message");
       Serial.println("R - :report Generate system report");
+      Serial.println("B - :report Generate system report");
       Serial.println("W - :wakeup Wake up system");
       Serial.println("S - :sleep Put system to sleep");
       Serial.println("P - :play Play audio");
       Serial.println("! - :stop Stop audio");
       Serial.println("Z - :replay Replay audio");
+      Serial.println("K - toggle between USB or knob (A8) volume control");
       Serial.println("+ - :volup Increase volume");
       Serial.println("- - :voldown Decrease volume");
+      Serial.println(":volume x.x - adjust volume, takes float between 0.0 and 1.0");
       Serial.println("> - :pwmupIncrease PWM range");
       Serial.println("< - :pwmdown Decrease PWM range");
       Serial.println("1-4 - :ledx Toggle individual LEDs");
@@ -479,7 +532,6 @@ bool processCommand(char cmd) {
       
     case CMD_PLAY:
       playAudio();
-      Serial.println("Playing audio");
       return true;
       
     case CMD_REPLAY:
@@ -521,6 +573,16 @@ bool processCommand(char cmd) {
       if (rangePWM < 0) rangePWM = 0;
       Serial.print("PWM range decreased to ");
       Serial.println(rangePWM);
+      return true;
+
+    case CMD_KNOB_CTRL:
+      if (knobCtrl){
+        knobCtrl = false;
+        Serial.print("Volume control via USB.");
+      } else {
+        knobCtrl = true;
+        Serial.print("Volume control via analog potentiometer.");
+      }
       return true;
       
     case CMD_LED_1: {
@@ -720,6 +782,24 @@ bool processMessage(char* msg) {
     processCommand(CMD_VOL_DOWN);
     return true;
   }
+  //analog volume ctrl
+  else if (strncmp(content, "volume ", 7) == 0) {
+    // Parse volume (expecting format "volume X.XX")
+    float newVolume = atof(content + 7);
+    
+    // Validate and apply volume
+    if (newVolume >= 0.0 && newVolume <= 1.0) {
+      audioVolume = newVolume;
+      sgtl5000.volume(audioVolume);
+      Serial.print("Volume adjusted to ");
+      Serial.println(audioVolume);
+      return true;
+    } else {
+      Serial.print("Invalid volume value: ");
+      Serial.println(newVolume);
+      return false;
+    }
+  }
   // PWM up command
   else if (strcmp(content, "pwmup") == 0) {
     Serial.println("PWM up command received via message");
@@ -777,35 +857,49 @@ void receiveSerialMessage() {
   // Read the ':' character
   messageBuffer[index++] = (char)Serial3.read();
   
+  // Wait a bit for more data to arrive
+  delay(5);
+  
   // Read until end of message or buffer is full
   bool messageComplete = false;
+  unsigned long startTime = millis();
   
-  while (!messageComplete && index < MSG_BUFFER_SIZE - 1 && Serial3.available()) {
-    char c = (char)Serial3.read();
-    
-    // Message is considered ended if a new line or ';' is read
-    if (c == '\n' || c == '\r' || c == ';') {
-      if (c == ';') {
-        // Include the semicolon in the message
+  while (!messageComplete && index < MSG_BUFFER_SIZE - 1) {
+    if (Serial3.available()) {
+      char c = (char)Serial3.read();
+      
+      // Message is considered ended if a new line, carriage return, or semicolon is read
+      if (c == '\n' || c == '\r' || c == ';') {
+        if (c == ';') {
+          // Include the semicolon in the message
+          messageBuffer[index++] = c;
+        }
+        messageComplete = true;
+      } else {
+        // Add character to buffer
         messageBuffer[index++] = c;
       }
+      
+      // Reset timeout when receiving data
+      startTime = millis();
+    } else if (millis() - startTime > 50) {
+      // Timeout if no new data for 50ms
       messageComplete = true;
-    } else {
-      // Add character to buffer
-      messageBuffer[index++] = c;
     }
-    
-    // Small delay to ensure all characters are received
-    delay(1);
   }
   
   // Null-terminate the string
   messageBuffer[index] = '\0';
   
-  // Print received message
-  Serial.print("Received message ");
-  Serial.println(messageBuffer);
-  processMessage(messageBuffer);
+  // Only process message if it has content
+  if (index > 1) {
+    // Print received message
+    Serial.print("Received message ");
+    Serial.println(messageBuffer);
+    processMessage(messageBuffer);
+  } else {
+    Serial.println("Received empty message, ignoring");
+  }
 }
 
 /**
@@ -849,6 +943,7 @@ bool checkUsbCommands() {
         case CMD_VOL_DOWN:
         case CMD_PWM_UP:
         case CMD_PWM_DOWN:
+        case CMD_KNOB_CTRL:
           // Valid command - process it
           commandProcessed = processCommand(inChar);
           break;

@@ -51,7 +51,7 @@ const int SEASHELL_PIN = 28;
 const int LONG_PIN = 32;
 
 //ANALOG PINS
-const uint8_t VOL_CTRL_PIN = A8;
+const uint8_t VOL_CTRL_PIN = A8; //pin22
 
 //IO ARRAYS
 const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
@@ -65,20 +65,21 @@ int trackIteration = 0;    //resets every day at START_HOUR
 const int START_HOUR = 6;  //daily wake-up time
 const int END_HOUR = 23;   //daily sleep time
 int pwmFreq = 25;   //Hz, refresh rate for the PWM
-const int REL_SW_DELAY = 500;
+const int REL_SW_DELAY = 500; //delay in between the relays are being switched
 bool systemAwake = false;  //activity time between START_HOUR and END_HOUR
-bool playbackStatus = false;
-bool messageIncoming = false;
-const int MSG_BUFFER_SIZE = 512;
-char messageBuffer[MSG_BUFFER_SIZE];
-const int UPDATE_RATE = 20;
-const bool PEAK_MODE = true;  //Switch between peak or rms mode
+bool playbackStatus = false;  //if the player is currently playing back
+bool messageIncoming = true; //if a mesage is currently coming in
+bool knobCtrl = false;         //if the player volume control should be via USB or via external analog potentiometer
+const int MSG_BUFFER_SIZE = 512;  //how long can a message be
+char messageBuffer[MSG_BUFFER_SIZE];  //message buffer
+const int UPDATE_RATE = 20;           //how often should we check for updates
+const bool PEAK_MODE = true;        //Switch between peak or rms mode
 const char days[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 const char SM_STR[13] = "SMALL.WAV";
 const char SS_STR[13] = "SEASHELL.WAV";
 const char LO_STR[13] = "LONG.WAV";
-char FILE_NAME[13];
-int PLAYER_ID;
+char FILE_NAME[13];     //empty string to be defined by a function, will take one of the 3 file names
+int PLAYER_ID;          //the id of this player 0 1 or 2
 
 #define SGTL_ERR_CODE 4
 #define PLAYBACK_CODE
@@ -304,6 +305,9 @@ void leader() {
     if (systemAwake) {
       if (wavPlayer.isPlaying()) {
         writeOutPWM(PWM_PIN);
+        if (knobCtrl){
+          volumeControl();
+        }
         displayBinaryCode(8);
       } else {
         displayBinaryCode(2);
