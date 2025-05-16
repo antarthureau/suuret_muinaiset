@@ -57,19 +57,27 @@ const uint8_t VOL_CTRL_PIN = A8; //pin22
 const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 
 //SYSTEM
-float audioVolume = 0.8;  //0-1, controls loudness
+/* -----------------------
+* VARIABLES YOU CAN CHANGE
+*/ -----------------------
+float audioVolume = 0.8;  //any float between 0.0 and 1.0. Will be automatic startup volume if the knobCtrl is set to false.
+bool knobCtrl = false;     //true to activate the volume knob control at startup, false to maintain audioVolume at startup. Can be switched later in the serial monitor using the command'K'
+const int START_HOUR = 6;  //daily wake-up time
+const int END_HOUR = 23;   //daily sleep time
+/* -----------------------
+* ########################
+*/ -----------------------
+
 int rangePWM = 255;       //0-255, controls brightness
 int currentCode = 0;      //starts at 0
 const int STARTUP_DELAY = 10000;   //inactivity time after setup for LONG player
 int trackIteration = 0;    //resets every day at START_HOUR
-const int START_HOUR = 6;  //daily wake-up time
-const int END_HOUR = 23;   //daily sleep time
 int pwmFreq = 25;   //Hz, refresh rate for the PWM
 const int REL_SW_DELAY = 500; //delay in between the relays are being switched
 bool systemAwake = false;  //activity time between START_HOUR and END_HOUR
 bool playbackStatus = false;  //if the player is currently playing back
 bool messageIncoming = true; //if a mesage is currently coming in
-bool knobCtrl = false;         //if the player volume control should be via USB or via external analog potentiometer
+
 const int MSG_BUFFER_SIZE = 512;  //how long can a message be
 char messageBuffer[MSG_BUFFER_SIZE];  //message buffer
 const int UPDATE_RATE = 20;           //how often should we check for updates
@@ -78,6 +86,7 @@ const char days[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday
 const char SM_STR[13] = "SMALL.WAV";
 const char SS_STR[13] = "SEASHELL.WAV";
 const char LO_STR[13] = "LONG.WAV";
+const char TEST_STR[13] = "TESTLOOP.WAV";
 char FILE_NAME[13];     //empty string to be defined by a function, will take one of the 3 file names
 int PLAYER_ID;          //the id of this player 0 1 or 2
 
@@ -217,7 +226,7 @@ void loop() {
     follower();
   }
 
-  delay(5);
+  delay(5); //debounce
 }
 //###########################################################################
 //#######                          HELPERS                            #######
@@ -227,7 +236,7 @@ void setupRTC() {
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
-    while (1) delay(10);
+    while (1) delay(10);//wait for rtc to be connected
   }
 
   // Always update the time when connected via USB

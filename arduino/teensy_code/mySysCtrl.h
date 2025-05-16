@@ -279,7 +279,6 @@ void systemReport(int player) {
 /**
  * Powers on amplifier then speaker with delay, wakes system up
  */
-
 void startupSequence() {
   //startup only if system is asleep
   if (!systemAwake){
@@ -291,7 +290,7 @@ void startupSequence() {
     delay(REL_SW_DELAY);
 
     systemAwake = true; //system wakeup
-    trackIteration = 0;
+    trackIteration = 0; //reset daily track count
   }
 }
 
@@ -332,6 +331,7 @@ void playAudio() {
   Serial.print(trackIteration);
   Serial.println(" during curent session (will be deleted tomorrow morning at 6AM).");
 
+  //print cpu temperature, and time if player 0
   float temp = tempmonGetTemp();
   Serial.print("CPU temperature ");
   Serial.print(temp);
@@ -347,11 +347,14 @@ void playAudio() {
  * @param command Character command to send
  */
 void sendSerialCommand(char command) {
+  //Send command
   Serial3.write(command);
 
+  //print command on usb monitor
   Serial.print("Command '");
   Serial.print(command);
   Serial.println("' was sent on Serial3");
+
   delay(50); //debounce
 }
 
@@ -371,35 +374,35 @@ void sendSerialMessage(char* message){
  * Rate-limited to prevent flooding the serial connection.
  */
 void volumeControl() {
+  //static variables for updates timing
   static unsigned long lastUpdateTime = 0;
   static unsigned long lastSendTime = 0;
   static float lastSentValue = -1.0; // Initialize to impossible value
   
-  // Limit updates to once every 50ms
+  //Limit updates to once every 50ms
   unsigned long currentTime = millis();
   if (currentTime - lastUpdateTime < 50) {
     return;
   }
   lastUpdateTime = currentTime;
   
-  // Read current value (0-1023 from analogRead)
+  // store analog value (0-1023 analog range mapped to 0.0-1.0)
   float rawValue = analogRead(VOL_CTRL_PIN) / 1024.0;
   
   // Quantize to 10 discrete steps (0.0, 0.1, 0.2, ... 1.0)
-  // This automatically eliminates noise and small variations
   float quantizedValue = round(rawValue * 10.0) / 10.0;
   
   // Only update if the quantized value is different from current volume
   if (quantizedValue != audioVolume) {
-    // Update audio volume
+    //set and update
     audioVolume = quantizedValue;
     sgtl5000.volume(audioVolume);
     
-    // Print change to serial
+    //print
     Serial.print("Volume set to ");
     Serial.println(audioVolume);
     
-    // Forward to other players if this is the leader, but rate limit to once per 500ms
+    //Forward volume to other players,  rate limit to once per 500ms
     if (PLAYER_ID == 0 && 
         (currentTime - lastSendTime > 500 || quantizedValue != lastSentValue)) {
       
@@ -419,37 +422,37 @@ void volumeControl() {
  */
 void sendStatusToLeader() {
   // Only followers should send status
-  if (PLAYER_ID == 0) return;
-  
-  // Create a status message
-  char statusMsg[MSG_BUFFER_SIZE];
-  
-  // Get CPU temperature
-  float temp = tempmonGetTemp();
-  
-  // Get audio playback position if playing
-  uint32_t positionMs = 0;
-  uint32_t lengthMs = 0;
-  if (wavPlayer.isPlaying()) {
-    positionMs = wavPlayer.positionMillis();
-    lengthMs = wavPlayer.lengthMillis();
+  if (PLAYER_ID != 0){
+    //init empty msg
+    char statusMsg[MSG_BUFFER_SIZE];
+    
+    // Get CPU temperature
+    float temp = tempmonGetTemp();
+    
+    // Get audio playback position if playing
+    uint32_t positionMs = 0;
+    uint32_t lengthMs = 0;
+    if (wavPlayer.isPlaying()) {
+      positionMs = wavPlayer.positionMillis();
+      lengthMs = wavPlayer.lengthMillis();
+    }
+    
+    // Format the status message - :STATUS|PLAYERID|TEMP|AWAKE|PLAYING|POS|LEN
+    //this format will be intepreted by player 0
+    snprintf(statusMsg, MSG_BUFFER_SIZE, ":STATUS|%d|%.1f|%d|%d|%lu|%lu", 
+            PLAYER_ID,              // Player ID
+            temp,                   // CPU temperature
+            systemAwake ? 1 : 0,    // System awake status
+            playbackStatus ? 1 : 0, // Playback status
+            positionMs,             // Current position in ms
+            lengthMs                // Total length in ms
+          );
+    
+    // Send the status message to leader
+    Serial3.println(statusMsg);
+    Serial.print("Sent status to leader: ");
+    Serial.println(statusMsg);
   }
-  
-  // Format the status message - :STATUS|PLAYERID|TEMP|AWAKE|PLAYING|POS|LEN
-  snprintf(statusMsg, MSG_BUFFER_SIZE, ":STATUS|%d|%.1f|%d|%d|%lu|%lu", 
-          PLAYER_ID,              // Player ID
-          temp,                   // CPU temperature
-          systemAwake ? 1 : 0,    // System awake status
-          playbackStatus ? 1 : 0, // Playback status
-          positionMs,             // Current position in ms
-          lengthMs                // Total length in ms
-        );
-  
-  // Send the status message to leader
-  Serial3.println(statusMsg);
-  
-  Serial.print("Sent status to leader: ");
-  Serial.println(statusMsg);
 }
 
 /**
@@ -463,7 +466,7 @@ void scheduledReboot() {
   //forward reboot command to followers
   if (PLAYER_ID == 0){
     sendSerialCommand(CMD_REBOOT);
-    delay(50);
+    delay(50); //debounce
   }
   
   // if system is awake shut it down
