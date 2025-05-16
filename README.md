@@ -1,2 +1,0 @@
-# suuret_muinaiset
- 
