@@ -1,6 +1,6 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" modified="2025-05-23T08:57:13.762Z" etag="PkctyEhyY8822lv3UZka" version="22.1.2" type="device">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" modified="2025-05-23T09:25:29.163Z" etag="fjw6g1GInBvp_C9Bxif3" version="22.1.2" type="device">
   <diagram name="Page-1" id="zNo30B6lt83TCyGsOatk">
-    <mxGraphModel dx="2879" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="1661" dy="480" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -1958,16 +1958,16 @@
           <mxGeometry x="999" y="3614.5" width="18.93" height="10" as="geometry" />
         </mxCell>
         <mxCell id="TPTEowwDjistTy6CAZPV-119" value="po1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#663300;fontColor=#ffffff;strokeColor=#663300;" vertex="1" parent="1">
-          <mxGeometry x="1361.54" y="3527.5" width="18.93" height="10" as="geometry" />
+          <mxGeometry x="1362.87" y="3541" width="18.93" height="10" as="geometry" />
         </mxCell>
         <mxCell id="TPTEowwDjistTy6CAZPV-120" value="AC L" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#663300;fontColor=#ffffff;strokeColor=#663300;" vertex="1" parent="1">
           <mxGeometry x="1361.54" y="3513.5" width="28.93" height="10" as="geometry" />
         </mxCell>
         <mxCell id="TPTEowwDjistTy6CAZPV-121" value="po2" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#663300;fontColor=#ffffff;strokeColor=#663300;" vertex="1" parent="1">
-          <mxGeometry x="1361.54" y="3542.5" width="18.93" height="10" as="geometry" />
+          <mxGeometry x="1362.87" y="3554.5" width="18.93" height="10" as="geometry" />
         </mxCell>
         <mxCell id="TPTEowwDjistTy6CAZPV-122" value="AC N" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#0000FF;fontColor=#ffffff;strokeColor=#0000FF;" vertex="1" parent="1">
-          <mxGeometry x="1361.54" y="3556.5" width="28.93" height="10" as="geometry" />
+          <mxGeometry x="1362.07" y="3527" width="28.93" height="10" as="geometry" />
         </mxCell>
         <mxCell id="TPTEowwDjistTy6CAZPV-123" value="12V (LED +)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#FFFFFF;fontColor=#000000;strokeColor=#663300;" vertex="1" parent="1">
           <mxGeometry x="1361.54" y="3681.5" width="70" height="10" as="geometry" />
@@ -2094,6 +2094,9 @@
         </mxCell>
         <mxCell id="TPTEowwDjistTy6CAZPV-201" value="Serial3 transmit" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
           <mxGeometry x="1087.12" y="3908" width="102.88" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="TPTEowwDjistTy6CAZPV-202" value="220V AC Live" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="3507.5" width="100" height="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
