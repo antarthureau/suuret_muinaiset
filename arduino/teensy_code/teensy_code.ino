@@ -62,8 +62,8 @@ const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 */ -----------------------
 float audioVolume = 0.8;  //any float between 0.0 and 1.0. Will be automatic startup volume if the knobCtrl is set to false.
 bool knobCtrl = false;     //true to activate the volume knob control at startup, false to maintain audioVolume at startup. Can be switched later in the serial monitor using the command'K'
-const int START_HOUR = 6;  //daily wake-up time
-const int END_HOUR = 23;   //daily sleep time
+const int START_HOUR = 8;  //daily wake-up time
+const int END_HOUR = 20;   //daily sleep time
 /* -----------------------
 * ########################
 */ -----------------------
