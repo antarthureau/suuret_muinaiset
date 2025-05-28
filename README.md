@@ -17,7 +17,7 @@ This project runs on the **Teensy 4.0** microcontroller and can be updated using
 - `mySysCtrl.h` - Custom library for system control (included in project)
 
 ### <ins>Code</ins>
-Current code updated and running on the systems can be found under *./arduino/teensy_code/teensy_code.ino*
+Current code updated and running on the systems can be found under `./arduino/teensy_code/teensy_code.ino`
 
 Some variables may be modified in the teensy_code.ino lines 60-69, such as startup audio volume, startup and shutdown hours, and if the system should start with a volume knob module attached or not (only for LONG). These variables can be modified using commands (see under) during runtime, but will always be reset to default after a reboot.
 
@@ -37,13 +37,13 @@ Different commands are available to control and get feedback from the units:
 | `K` | `toggle` | between USB or knob (A8) volume control |
 | `+` | `:volup` | Increase volume |
 | `-` | `:voldown` | Decrease volume |
-| |`:volume x.x`  | adjust volume, takes float between 0.0 and 1.0 |
+| - |`:volume x.x`  | adjust volume, takes float between 0.0 and 1.0 |
 | `>` | `:pwmup` | Increase PWM range |
 | `<` | `:pwmdown` | Decrease PWM range |
 | `1-4` | `:ledx` | Toggle individual LEDs |
 
 ### <ins>Diagram</ins>
-A flowchart diagram can be found at >*./media/flowchart.drawio*, and runs on a free software called drawio, also available as a web version at [draw.io](www.draw.io).
+A flowchart diagram can be found at `./media/flowchart.drawio`, and runs on a free software called drawio, also available as a web version at [draw.io](www.draw.io).
 
 ### <ins>Pinout</ins>
 |Digital Pin| Analog| Description|
@@ -57,10 +57,10 @@ A flowchart diagram can be found at >*./media/flowchart.drawio*, and runs on a f
 | 6 | - | PWM_OUT (LED strip control) |
 | 7 | - | Can be used as backup receiver for Serial2 instead of Serial3 |
 | 8 | - | Can be used as backup transmitter for Serial2 instead of Serial3 |
-| 9 | - | Unused |
+| 9 | - | Unused / NC  |
 | 10 | - | SDCARD_CS_PIN (SD card) |
 | 11 | - | SDCARD_MOSI_PIN (SD card) |
-| 12 | - | Unused |
+| 12 | - | Unused / NC |
 | 13 | - | SDCARD_SCK_PIN (SD card) |
 | 14 | A0 | RX3 (receive serial on SM/SS, unused on LO) |
 | 15 | A1 | TX3 (send serial on LO, unused on SM/SS) |
