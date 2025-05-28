@@ -491,21 +491,21 @@ bool processCommand(char cmd) {
   switch(cmd) {
     case CMD_HELP:
       Serial.println("\n----- AVAILABLE COMMANDS -----");
-      Serial.println("H - :help Display this help message");
-      Serial.println("R - :report Generate system report");
-      Serial.println("B - :report Generate system report");
-      Serial.println("W - :wakeup Wake up system");
-      Serial.println("S - :sleep Put system to sleep");
-      Serial.println("P - :play Play audio");
-      Serial.println("! - :stop Stop audio");
-      Serial.println("Z - :replay Replay audio");
-      Serial.println("K - toggle between USB or knob (A8) volume control");
-      Serial.println("+ - :volup Increase volume");
-      Serial.println("- - :voldown Decrease volume");
-      Serial.println(":volume x.x - adjust volume, takes float between 0.0 and 1.0");
-      Serial.println("> - :pwmupIncrease PWM range");
-      Serial.println("< - :pwmdown Decrease PWM range");
-      Serial.println("1-4 - :ledx Toggle individual LEDs");
+      Serial.println("H - :help || Display this help message");
+      Serial.println("R - :report   || Generate system report");
+      Serial.println("B - :report   || Generate system reboot");
+      Serial.println("W - :wakeup   || Wake up system");
+      Serial.println("S - :sleep    || Put system to sleep");
+      Serial.println("P - :play     || Play audio");
+      Serial.println("! - :stop     || Stop audio");
+      Serial.println("Z - :replay   || Replay audio");
+      Serial.println("K - toggle    || between USB or knob (A8) volume control");
+      Serial.println("+ - :volup    || Increase volume");
+      Serial.println("- - :voldown  || Decrease volume");
+      Serial.println(":volume x.x   || adjust volume, takes float between 0.0 and 1.0");
+      Serial.println("> - :pwmup    || Increase PWM range");
+      Serial.println("< - :pwmdown  || Decrease PWM range");
+      Serial.println("1-4 - :ledx   || Toggle individual LEDs");
       Serial.println("------------------------------\n");
       return true;
       
