@@ -26,7 +26,7 @@ Different commands are available to control and get feedback from the units:
 
 | Key | Command | Description |
 |-----|---------|-------------|
-| `H` | `:help` | Display this help message |
+| `H` | `:help` | Displays a help message |
 | `R` | `:report` | Generate system report |
 | `B` | `:report` | Generate system reboot |
 | `W` | `:wakeup` | Wake up system |
@@ -37,10 +37,12 @@ Different commands are available to control and get feedback from the units:
 | `K` | `toggle` | between USB or knob (A8) volume control |
 | `+` | `:volup` | Increase volume |
 | `-` | `:voldown` | Decrease volume |
-| - |`:volume x.x`  | adjust volume, takes float between 0.0 and 1.0 |
+|  |`:volume x.x`  | adjust volume, takes float between 0.0 and 1.0 |
 | `>` | `:pwmup` | Increase PWM range |
 | `<` | `:pwmdown` | Decrease PWM range |
 | `1-4` | `:ledx` | Toggle individual LEDs |
+
+LONG passes USB commands further to SEASHELL and SMALL, but USB commands ran locally on SMALL or SEASHELL will not be passed to other units.
 
 ### <ins>Diagram</ins>
 A flowchart diagram can be found at `./media/flowchart.drawio`, and runs on a free software called drawio, also available as a web version at [draw.io](www.draw.io).
