@@ -34,10 +34,10 @@ Different commands are available to control and get feedback from the units:
 | `P` | `:play` | Play audio |
 | `!` | `:stop` | Stop audio |
 | `Z` | `:replay` | Replay audio |
-| `K` | `toggle` | between USB or knob (A8) volume control |
+| `K` | `:toggle` | between USB or knob (A8) volume control |
 | `+` | `:volup` | Increase volume |
 | `-` | `:voldown` | Decrease volume |
-|  |`:volume x.x`  | adjust volume, takes float between 0.0 and 1.0 |
+|  |`:volume x.x`  | adjust volume, takes float between 0.0 and 1.0 (ex ":volume 0.6") |
 | `>` | `:pwmup` | Increase PWM range |
 | `<` | `:pwmdown` | Decrease PWM range |
 | `1-4` | `:ledx` | Toggle individual LEDs |
