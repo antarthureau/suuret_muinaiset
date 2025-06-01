@@ -45,7 +45,7 @@ Different commands are available to control and get feedback from the units:
 LONG passes USB commands further to SEASHELL and SMALL, but USB commands ran locally on SMALL or SEASHELL will not be passed to other units.
 
 ### <ins>Diagram</ins>
-A flowchart diagram can be found at `./media/flowchart.drawio`, and runs on a free software called drawio, also available as a web version at [draw.io](https://www.draw.io).
+A flowchart diagram can be found at `./media/flowchart.drawio`, and runs on a free software called drawio, also available as a web version at [https://app.diagrams.net/](https://app.diagrams.net/).
 
 ### <ins>Pinout</ins>
 |Digital Pin| Analog| Description|
