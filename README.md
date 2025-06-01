@@ -1,13 +1,13 @@
 # suuret_muinaiset system
 
 ### <ins>Hardware/Software Requirements</ins>
-This project runs on the **Teensy 4.0** microcontroller and can be updated using the Arduino framework. To program and upload code to the Teensy, you'll need to install Teensyduino, which adds Teensy support to the Arduino IDE.
+This project runs on the **Teensy 4.0** microcontroller and can be updated using the Arduino framework. To program and upload code to the Teensy, you'll need to install Teensyduino, which adds Teensy support to the Arduino IDE. The software used to open and mofidy the diagram us drawio.
 
 + **Download Arduino IDE:** [https://www.arduino.cc/en/software/](https://www.arduino.cc/en/software/)
 
 + **Download Teensyduino:** [https://www.pjrc.com/teensy/td_download.html](https://www.pjrc.com/teensy/td_download.html)
 
-+ **Diagram**: [Download drawio](https://github.com/jgraph/drawio-desktop/releases/tag/v27.0.9) or [use online version](https://app.diagrams.net)
++ **Draeio**: [Download drawio](https://github.com/jgraph/drawio-desktop/releases/tag/v27.0.9) or [use online version](https://app.diagrams.net)
 
 **Libraries used:**
 - `Audio.h` - Teensy Audio Library (included with Teensyduino)
