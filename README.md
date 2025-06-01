@@ -78,5 +78,23 @@ A flowchart diagram can be found at `./media/flowchart.drawio`, and runs on a fr
 | 30 | - | PLAYER_ID (1, SM) |
 | 32 | - | PLAYER_ID (0, LO) |
 
+### <ins>Toolkit required for maintenance</ins>
 
+Screwdrivers to open/close the boxes and fasten terminal blocks:
++ Flat 3mm
++ Flat 6mm
++ Philips 6mm
 
+Screwdrivers to swap boards within the boxes:
++ Philips 000
++ Philips 00
++ Hex 5mm
++ Hex 5.5mm
+
+Multimeter to test voltage and continuity
+
+Wago connectors and crocodile cables to test temporary connections
+
+Computer with USB-A connector and Arduino + Teensyduino installed to upload new code
+
+Any serial monitor software over USB to monitor the systems
