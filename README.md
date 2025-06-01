@@ -7,6 +7,8 @@ This project runs on the **Teensy 4.0** microcontroller and can be updated using
 
 + **Download Teensyduino:** [https://www.pjrc.com/teensy/td_download.html](https://www.pjrc.com/teensy/td_download.html)
 
++ **Diagram: [Download drawio](https://github.com/jgraph/drawio-desktop/releases/tag/v27.0.9) or [use online version](https://app.diagrams.net)**
+
 **Libraries used:**
 - `Audio.h` - Teensy Audio Library (included with Teensyduino)
 - `Wire.h`, `SPI.h`, `SD.h` - Standard Arduino libraries (built-in)
