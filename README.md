@@ -7,7 +7,7 @@ This project runs on the **Teensy 4.0** microcontroller and can be updated using
 
 + **Download Teensyduino:** [https://www.pjrc.com/teensy/td_download.html](https://www.pjrc.com/teensy/td_download.html)
 
-+ **Draeio**: [Download drawio](https://github.com/jgraph/drawio-desktop/releases/tag/v27.0.9) or [use online version](https://app.diagrams.net)
++ **Drawio**: [Download drawio](https://github.com/jgraph/drawio-desktop/releases/tag/v27.0.9) or [use online version](https://app.diagrams.net)
 
 **Libraries used:**
 - `Audio.h` - Teensy Audio Library (included with Teensyduino)
