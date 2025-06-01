@@ -88,10 +88,9 @@ Screwdrivers to open/close the boxes and fasten terminal blocks:
 + Philips 6mm
 
 Screwdrivers to swap boards within the boxes:
-+ Philips 000
-+ Philips 00
-+ Hex 5mm
-+ Hex 5.5mm
++ Philips 000 or Philips 00
++ Hex/Wrench 4
++ Hex/Wrench 4.5mm
 
 Multimeter to test voltage and continuity
 
