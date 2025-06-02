@@ -43,6 +43,8 @@ Different commands are available to control and get feedback from the units:
 | `>` | `:pwmup` | Increase PWM range |
 | `<` | `:pwmdown` | Decrease PWM range |
 |  | `:ledx` | Toggle individual LEDs with an int from 0 to 15|
+||:seashell| From LONG player, calls for a report from seashell|
+||:small| From LONG player, calls for a report from small|
 
 LONG passes USB commands further to SEASHELL and SMALL, but USB commands ran locally on SMALL or SEASHELL will not be passed to other units.
 
