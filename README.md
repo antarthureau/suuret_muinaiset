@@ -30,7 +30,7 @@ Different commands are available to control and get feedback from the units:
 |-----|---------|-------------|
 | `H` | `:help` | Displays a help message |
 | `R` | `:report` | Generate system report |
-| `B` | `:report` | Generate system reboot |
+| `B` | `:reboot` | Generate system reboot |
 | `W` | `:wakeup` | Wake up system |
 | `S` | `:sleep` | Put system to sleep |
 | `P` | `:play` | Play audio |
@@ -42,7 +42,7 @@ Different commands are available to control and get feedback from the units:
 |  |`:volume x.x`  | adjust volume, takes float between 0.0 and 1.0 (ex ":volume 0.6") |
 | `>` | `:pwmup` | Increase PWM range |
 | `<` | `:pwmdown` | Decrease PWM range |
-| `1-4` | `:ledx` | Toggle individual LEDs |
+|  | `:ledx` | Toggle individual LEDs with an int from 0 to 15|
 
 LONG passes USB commands further to SEASHELL and SMALL, but USB commands ran locally on SMALL or SEASHELL will not be passed to other units.
 
@@ -81,7 +81,6 @@ A flowchart diagram can be found at `./flowchart diagram.drawio` or `./flowchart
 | 32 | - | PLAYER_ID (0, LO) |
 
 ### <ins>Toolkit required for maintenance</ins>
-
 Screwdrivers to open/close the boxes and fasten terminal blocks:
 + Flat 3mm
 + Flat 6mm
