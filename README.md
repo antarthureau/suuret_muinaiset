@@ -97,6 +97,8 @@ Multimeter to test voltage and continuity
 
 Wago connectors and crocodile cables to test temporary connections
 
+A pair of headphones with minijack to test audio output on teensy
+
 Computer with USB-A connector and Arduino + Teensyduino installed to upload new code
 
 Any serial monitor software over USB to monitor the systems
