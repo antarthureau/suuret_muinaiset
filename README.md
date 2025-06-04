@@ -43,8 +43,8 @@ Different commands are available to control and get feedback from the units:
 | `>` | `:pwmup` | Increase PWM range |
 | `<` | `:pwmdown` | Decrease PWM range |
 |  | `:ledx` | Toggle individual LEDs with an int from 0 to 15|
-||:seashell| From LONG player, calls for a report from seashell|
-||:small| From LONG player, calls for a report from small|
+||`:seashell`| From LONG player only, calls for a report from seashell|
+||`:small`| From LONG player only, calls for a report from small|
 
 LONG passes USB commands further to SEASHELL and SMALL, but USB commands ran locally on SMALL or SEASHELL will not be passed to other units.
 
@@ -96,6 +96,8 @@ Screwdrivers to swap boards within the boxes:
 Multimeter to test voltage and continuity
 
 Wago connectors and crocodile cables to test temporary connections
+
+A pair of headphones with minijack to test audio output on teensy
 
 Computer with USB-A connector and Arduino + Teensyduino installed to upload new code
 
