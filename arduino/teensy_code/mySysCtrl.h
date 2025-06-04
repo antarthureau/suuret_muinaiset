@@ -493,7 +493,7 @@ bool processCommand(char cmd) {
       Serial.println("\n----- AVAILABLE COMMANDS -----");
       Serial.println("H - :help || Display this help message");
       Serial.println("R - :report   || Generate system report");
-      Serial.println("B - :report   || Generate system reboot");
+      Serial.println("B - :reboot   || Generate system reboot");
       Serial.println("W - :wakeup   || Wake up system");
       Serial.println("S - :sleep    || Put system to sleep");
       Serial.println("P - :play     || Play audio");
