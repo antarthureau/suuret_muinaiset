@@ -93,12 +93,13 @@ Screwdrivers to swap boards within the boxes:
 + Hex/Wrench 4
 + Hex/Wrench 4.5mm
 
-Multimeter to test voltage and continuity
+Electrical components, tools and cables/adapters:
++ Multimeter to test voltage, current and and continuity
++ Wago connectors and crocodile cables to test temporary connections
++ A pair of headphones with minijack to test audio output on teensy
++ Computer with USB-A connector and Arduino + Teensyduino + specified libraries (see above) installed to upload new code
++ One or several long USB-A extension cables and a dongle to connect the USB of all three systems to the computer
++ An Arduino board (UNO for example) for tasks like reprogramming the clock
++ Any serial monitor software over USB to monitor the systems
 
-Wago connectors and crocodile cables to test temporary connections
-
-A pair of headphones with minijack to test audio output on teensy
-
-Computer with USB-A connector and Arduino + Teensyduino installed to upload new code
-
-Any serial monitor software over USB to monitor the systems
+Gaffer tape, zip ties and miscelaneous crimping tools can be helpful
