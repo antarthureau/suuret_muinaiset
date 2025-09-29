@@ -247,11 +247,14 @@ void setupRTC() {
     
     // Display the new time
     clockMe();
-  } else if (rtc.lostPower()) {
+  }
+    /*
+  else if (rtc.lostPower()) {
     // Still update if power was lost, even if USB is not connected
     Serial.println("RTC lost power, setting time from compile timestamp");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
+  */
 }
 
 /*
