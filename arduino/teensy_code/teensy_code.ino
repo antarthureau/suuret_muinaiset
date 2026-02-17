@@ -231,19 +231,27 @@ void setupRTC() {
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
-    while (1) delay(10);//wait for rtc to be connected
+    while (1) delay(10);
+  }
+
+  // If the RTC lost backup power, time resets to Jan 1, 2000.
+  // To avoid this situation, set RTC to compile time as a fallback
+  // to keep wake/sleep schedule reasonable.
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, time is invalid!");
+    // Set to compile time as a reasonable fallback
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    Serial.println("RTC time reset to compilation timestamp");
   }
 
   // Always update the time when connected via USB
   if (Serial) {
-    // Time will be set based on when the code was compiled
     Serial.println("USB connected - updating RTC time from compilation timestamp");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    
-    // Display the new time
     clockMe();
   }
 }
+
 
 /*
  * helper function to write pwm output from peak or rms 
