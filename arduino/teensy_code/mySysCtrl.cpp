@@ -121,7 +121,7 @@ void systemReport(int player) {
   float temp = tempmonGetTemp();
   Serial.print("CPU temperature ");
   Serial.print(temp);
-  Serial.println(" °C");
+  Serial.println(" \xB0""C");
 
   // SD CARD configuration
   Serial.println("\n-- SD CARD PINS --");
@@ -261,7 +261,7 @@ void playAudio() {
   float temp = tempmonGetTemp();
   Serial.print("CPU temperature ");
   Serial.print(temp);
-  Serial.println(" °C");
+  Serial.println(" \xB0""C");
 
   if (PLAYER_ID == 0){
     clockMe();
@@ -631,7 +631,7 @@ bool processMessage(char* msg) {
         float followerTemp = atof(token);
         Serial.print("CPU Temperature: ");
         Serial.print(followerTemp);
-        Serial.println(" °C");
+        Serial.println(" \xB0""C");
 
         token = strtok(NULL, "|");
         if (token != NULL) {
