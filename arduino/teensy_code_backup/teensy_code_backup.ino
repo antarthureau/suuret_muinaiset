@@ -77,7 +77,7 @@ bool systemAwake = false;  //activity time between START_HOUR and END_HOUR
 bool playbackStatus = false;  //if the player is currently playing back
 bool messageIncoming = true; //if a mesage is currently coming in
 
-const int MSG_BUFFER_SIZE = 512;  //how long can a message be
+const int MSG_BUFFER_SIZE = 128;  //how long can a message be
 char messageBuffer[MSG_BUFFER_SIZE];  //message buffer
 const int UPDATE_RATE = 20;           //how often should we check for updates
 const bool PEAK_MODE = true;        //Switch between peak or rms mode
@@ -216,8 +216,9 @@ void loop() {
     follower();
   }
 
-  delay(5); //debounce
+  delay(1); //debounce
 }
+
 //###########################################################################
 //#######                          HELPERS                            #######
 //###########################################################################
@@ -229,8 +230,6 @@ void setupRTC() {
     while (1) delay(10);
   }
 
-  /*
-
   // If the RTC lost backup power, time resets to Jan 1, 2000.
   // To avoid this situation, set RTC to compile time as a fallback
   // to keep wake/sleep schedule reasonable.
@@ -240,15 +239,14 @@ void setupRTC() {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     Serial.println("RTC time reset to compilation timestamp");
   }
-  
-  */
-
+  /*
   // Always update the time when connected via USB
   if (Serial) {
     Serial.println("USB connected - updating RTC time from compilation timestamp");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     clockMe();
   }
+  */
 }
 
 
