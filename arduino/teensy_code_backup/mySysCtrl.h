@@ -1063,17 +1063,6 @@ void statusUpdates() {
     initialCheckDone = true;
     DateTime now = rtc.now();
     int currentHour = now.hour();
-
-    /*   
-    Serial.print("Time check: ");
-    Serial.print(currentHour);
-    Serial.print(":");
-    Serial.print(now.minute());
-    Serial.print(" - Active hours: ");
-    Serial.print(START_HOUR);
-    Serial.print("-");
-    Serial.println(END_HOUR);
-    */
     
     //if current time is greater or equal to 6AM and inferior than 11PM, system should be active
     bool isActive = (currentHour >= START_HOUR && currentHour < END_HOUR);
