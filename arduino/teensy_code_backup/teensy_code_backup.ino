@@ -25,7 +25,6 @@ AudioControlSGTL5000 sgtl5000;
 //RTC
 RTC_DS3231 rtc;
 
-
 //AUDIO MATRIX
 AudioConnection patchCord1(wavPlayer, 0, audioOutput, 0);
 AudioConnection patchCord2(wavPlayer, 0, audioPeak, 0);
@@ -101,10 +100,6 @@ int PLAYER_ID;          //the id of this player 0 1 or 2
 void setup() {
   Serial.begin(9600);
   Serial3.begin(9600);
-  
-  //WDT_timings_t config;
-  //config.timeout = 5;
-  //wdt.begin(config);
   
   // Log any crash report data
   if (CrashReport) {
@@ -234,6 +229,8 @@ void setupRTC() {
     while (1) delay(10);
   }
 
+  /*
+
   // If the RTC lost backup power, time resets to Jan 1, 2000.
   // To avoid this situation, set RTC to compile time as a fallback
   // to keep wake/sleep schedule reasonable.
@@ -243,6 +240,8 @@ void setupRTC() {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     Serial.println("RTC time reset to compilation timestamp");
   }
+  
+  */
 
   // Always update the time when connected via USB
   if (Serial) {
