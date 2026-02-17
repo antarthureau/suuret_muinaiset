@@ -14,7 +14,6 @@
 #include <RTClib.h>
 #include "LedzCtrl.h"       //custom lib for LEDs array control
 #include "mySysCtrl.h"      //custom lib for system control
-//#include <Watchdog_t4.h>
 
 //OBJECTS
 //audio
@@ -25,8 +24,7 @@ AudioOutputI2S audioOutput;
 AudioControlSGTL5000 sgtl5000;
 //RTC
 RTC_DS3231 rtc;
-//watchdog
-//WDT_T4<WDT1> wdt;
+
 
 //AUDIO MATRIX
 AudioConnection patchCord1(wavPlayer, 0, audioOutput, 0);
@@ -57,16 +55,18 @@ const uint8_t VOL_CTRL_PIN = A8; //pin22
 const uint8_t LED_ARRAY[4] = {LED_1, LED_2, LED_3, LED_4};
 
 //SYSTEM
-/* -----------------------
-* VARIABLES YOU CAN CHANGE
-*/ -----------------------
+/** -----------------------
+** VARIABLES YOU CAN CHANGE
+** -----------------------
+**/
 float audioVolume = 0.8;  //any float between 0.0 and 1.0. Will be automatic startup volume if the knobCtrl is set to false.
 bool knobCtrl = false;     //true to activate the volume knob control at startup, false to maintain audioVolume at startup. Can be switched later in the serial monitor using the command'K'
 const int START_HOUR = 8;  //daily wake-up time
 const int END_HOUR = 20;   //daily sleep time
-/* -----------------------
-* ########################
-*/ -----------------------
+/** -----------------------
+** ########################
+** -----------------------
+**/
 
 int rangePWM = 255;       //0-255, controls brightness
 int currentCode = 0;      //starts at 0
@@ -185,20 +185,15 @@ void setup() {
   systemAwake = false;
   playbackStatus = false;
   trackIteration = 0;
-  
-  //wdt.reset();
 }
 
-//start millis thread timer
+//Initiate ellaspedMillis timers
 elapsedMillis pwmTimer;       // For PWM updates
 elapsedMillis commandTimer;   // For checking commands
 elapsedMillis statusTimer;    // For status updates
-//elapsedMillis reportTimer;    // For periodic reporting (optional)
 
 //LOOP
 void loop() {
-  //wdt.feed();
-
   if (statusTimer >= 1000) {
     statusUpdates();
     statusTimer = 0;
@@ -248,13 +243,6 @@ void setupRTC() {
     // Display the new time
     clockMe();
   }
-    /*
-  else if (rtc.lostPower()) {
-    // Still update if power was lost, even if USB is not connected
-    Serial.println("RTC lost power, setting time from compile timestamp");
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  }
-  */
 }
 
 /*
@@ -281,6 +269,9 @@ void writeOutPWM(uint8_t pin) {
   }
 }
 
+/**
+* method for the leader unit
+*/
 void leader() {
   static elapsedMillis playbackTimer;
   static elapsedMillis updateTimer;
@@ -336,6 +327,9 @@ void leader() {
   }
 }
 
+/**
+* method for the follower units
+*/
 void follower() {
   static elapsedMillis commandCheckTimer;
   static elapsedMillis updateTimer;
@@ -382,4 +376,3 @@ void follower() {
     }
   }
 }
-
