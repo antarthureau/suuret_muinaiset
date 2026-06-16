@@ -254,7 +254,6 @@
 #X msg 143 121 open /home/mike/Documents/suuret_muinaiset/audio_files/LONG.wav, f 37;
 #X msg 503 121 open /home/mike/Documents/suuret_muinaiset/audio_files/SMALL.wav, f 37;
 #X msg 843 121 open /home/mike/Documents/suuret_muinaiset/audio_files/SEASHELL.wav, f 37;
-#X text 404 502 main patch multi mediaplayer;
 #X connect 0 0 29 0;
 #X connect 0 0 33 0;
 #X connect 1 0 2 0;
@@ -285,11 +284,10 @@
 #X connect 32 0 5 0;
 #X connect 32 0 14 0;
 #X connect 32 0 23 0;
-#X connect 32 0 33 0;
 #X connect 33 0 40 0;
 #X connect 33 0 41 0;
-#X connect 33 0 39 0;
 #X connect 33 0 34 0;
+#X connect 33 0 39 0;
 #X connect 34 0 31 0;
 #X connect 35 0 36 0;
 #X connect 35 1 36 1;
