@@ -81,17 +81,15 @@ Screwdrivers to open/close boxes and fasten terminal blocks: flat 3mm, flat 6mm,
 
 Multimeter to test voltage, current, and continuity.
 
-Oscilloscope, for checking envelope-follower and gate voltages on the analog LED circuits.
-
-Breadboard and Falstad simulator access, for testing/iterating on the analog circuit before field changes.
-
 Wago connectors and crocodile cables for temporary test connections.
 
-A pair of headphones with minijack, to test audio output directly from the Pi.
+A pair of headphones with minijack, to test audio output directly from the Pi (DAC 5/6)
 
-HDMI cable, keyboard and mouse, for direct access to the Pi's desktop on site.
+HDMI cable, screen, keyboard and mouse, for direct access to the Pi's desktop on site.
 
 Computer or laptop for SSH/Pi Connect access when remote troubleshooting is preferred over an on-site screen.
+
+A smartphone with hotspot to connect the Pi to the wifi, allowing remote control via Pi-Connect
 
 Long Cat6 testing cable or cable tester, for diagnosing the underground transformer runs.
 
