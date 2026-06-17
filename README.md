@@ -1,14 +1,16 @@
 # suuret_muinaiset system (V2)
 ## Overview
-The installation runs on a single Raspberry Pi 5, replacing the previous three-unit Teensy-based system (LONG, SMALL, SEASHELL). One Pi running Pure Data plays three audio files simultaneously, one per creature, and drives both the speakers and the LED lighting for all three from a single source.
-Hardware/Software Requirements
+The installation runs on a single Raspberry Pi 5, replacing the previous three-unit Teensy-based system (LONG, SMALL, SEASHELL).
+One Raspberry Pi 5 running Pure Data plays three audio files simultaneously (main.pd in pd_codebase), one file per creature, and drives both the speakers and the LED lighting (sound-to-light analog circuit) for all three units.
+
+## Hardware/Software Requirements
 Raspberry Pi 5 with onboard RTC and battery, used for the daily sleep/wake cycle.
 
-Pure Data (Pd), run headless via pd -nogui.
+Pure Data (Pd), run headless via pd -nogui. Login at desktop activated, so troubleshooting with mouse, keyboard and HDMI screen is possible.
 
 zexy external library (installed via Deken), loaded in the patch with [declare -lib zexy].
 
-HiFiBerry 8-channel DAC card, three of its outputs used for the three audio channels.
+HiFiBerry 8-channel DAC card, three of its outputs used for the three audio channels. LONG on DAC3, SMALL on DAC1, SEASHELL on DAC2, and DAC5/6 is a headphone out with a sum of all creatures.
 
 Neutrik transformers, used twice per channel: once locally to balance the signal for transmission, and once at each remote creature to convert back to unbalanced before the amp.
 
@@ -18,15 +20,19 @@ Amplifier and speaker at each creature site.
 
 Discrete analog envelope-follower/MOSFET circuit per creature (two BC547 transistors plus an IRL540 MOSFET) converting that creature's audio amplitude into LED strip brightness.
 
-12V LED strip per creature (final installation voltage; breadboard testing done at 24V).
+12V LED strip per creature (final installation voltage)
 
-Drawio, for diagrams:
-Signal path
+2* SMPS per unit: 36VDC for the amplifier and 12VDC for the LED strips.
+
+## Drawio, for diagrams:
+### Signal path
 Pd plays three looping audio files, one per creature, out through three channels of the HiFiBerry DAC. Each unbalanced line passes through a Neutrik transformer to balance it for the long underground Cat6 run to that creature's location. At the far end, a second Neutrik transformer converts the signal back to unbalanced before it reaches that creature's amplifier and speaker.
-Audio-to-light circuit
+### Audio-to-light circuit
 Each creature also has its own analog circuit converting its audio channel's amplitude into LED brightness, independent of the main speaker signal path. Two BC547 stages provide double inversion to restore correct polarity, feeding a half-wave rectifier and then the IRL540 MOSFET gate, which switches the 12V LED strip. Wiring convention: MOSFET drain to LED strip negative, source to GND. Target envelope decay is 100 to 200ms.
+
 Status: in progress. Pending items include resolving gate voltage headroom on the envelope-follower output, confirming correct MOSFET orientation in the final build, and moving from the 24V breadboard test supply to the 12V installation supply. A professional circuit design was also commissioned in parallel and may be evaluated against this build.
 Pure Data patch
+
 Main patch: pd_codebase/main.pd, run in nogui mode.
 
 Loops playback continuously; prints a status line at the start of each loop, captured by the terminal/log rather than the patch itself doing timestamping.
