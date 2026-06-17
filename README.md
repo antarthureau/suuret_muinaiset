@@ -57,7 +57,7 @@ echo $(date -d "tomorrow 08:00" +%s) > /sys/class/rtc/rtc0/wakealarm
 
 It must use the full path /usr/sbin/shutdown, since cron runs with a minimal PATH that doesn't include /usr/sbin.
 
-The script is triggered daily by root's crontab (sudo crontab -e). Current entry: 15 15 * * * /home/mike/sleep_pi.sh, meaning cron fires the sleep script at 15:15, and the script sets the wake alarm for 08:00 the next day. When changing sleep or wake times, update both the cron line and the date string in the script together, leaving a few minutes of margin between the cron trigger and the wake target.
+The script is triggered daily by root's crontab (sudo crontab -e). Current entry: 00 22 * * * /home/mike/sleep_pi.sh, meaning cron fires the sleep script at 22:00, and the script sets the wake alarm for 08:00 the next day. When changing sleep or wake times, update both the cron line and the date string in the script together, leaving a few minutes of margin between the cron trigger and the wake target.
 
 ### Autostart
 
@@ -71,11 +71,11 @@ The trailing & is required so labwc doesn't wait for PD to exit before finishing
 
 08:00, Pi wakes, boots to desktop, PD autostarts via labwc.
 
-08:00 to 15:15, PD runs continuously, looping playback through all three channels.
+08:00 to 22:00, PD runs continuously, looping playback through all three channels.
 
-15:15, cron fires sleep_pi.sh, which sets the next wake alarm and shuts the Pi down fully.
+22:00, cron fires sleep_pi.sh, which sets the next wake alarm and shuts the Pi down fully.
 
-15:15 to 08:00, Pi is fully powered off.
+22:00 to 08:00, Pi is fully powered off.
 
 ## Toolkit required for maintenance
 
