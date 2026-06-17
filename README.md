@@ -1,105 +1,79 @@
-# suuret_muinaiset system
+# suuret_muinaiset system (V2)
+## Overview
+The installation runs on a single Raspberry Pi 5, replacing the previous three-unit Teensy-based system (LONG, SMALL, SEASHELL). One Pi running Pure Data plays three audio files simultaneously, one per creature, and drives both the speakers and the LED lighting for all three from a single source.
+Hardware/Software Requirements
+Raspberry Pi 5 with onboard RTC and battery, used for the daily sleep/wake cycle.
 
-### <ins>Hardware/Software Requirements</ins>
-This project runs on the **Teensy 4.0** microcontroller and can be updated using the Arduino framework. To program and upload code to the Teensy, you'll need to install Teensyduino, which adds Teensy support to the Arduino IDE. The software used to open and mofidy the diagram us drawio.
+Pure Data (Pd), run headless via pd -nogui.
 
-+ **Download Arduino IDE:** [https://www.arduino.cc/en/software/](https://www.arduino.cc/en/software/)
+zexy external library (installed via Deken), loaded in the patch with [declare -lib zexy].
 
-+ **Download Teensyduino:** [https://www.pjrc.com/teensy/td_download.html](https://www.pjrc.com/teensy/td_download.html)
+HiFiBerry 8-channel DAC card, three of its outputs used for the three audio channels.
 
-+ **Drawio**: [Download drawio](https://github.com/jgraph/drawio-desktop/releases/tag/v27.0.9) or [use online version](https://app.diagrams.net)
+Neutrik transformers, used twice per channel: once locally to balance the signal for transmission, and once at each remote creature to convert back to unbalanced before the amp.
 
-**Libraries used:**
-- `Audio.h` - Teensy Audio Library (included with Teensyduino)
-- `Wire.h`, `SPI.h`, `SD.h` - Standard Arduino libraries (built-in)
-- `SerialFlash.h` - Serial Flash library (install via Arduino Library Manager)
-- `elapsedMillis.h` - elapsedMillis library (install via Arduino Library Manager)
-- `RTClib.h` - Real Time Clock library by Adafruit (install via Arduino Library Manager)
-- `LedzCtrl.h` - Custom library for LEDs array control (included in project)
-- `mySysCtrl.h` - Custom library for system control (included in project)
+Cat6 cable, run underground, carrying the balanced signal to each creature's site.
 
-### <ins>Code</ins>
-Current code updated and running on the systems can be found under `./arduino/teensy_code/teensy_code.ino`
+Amplifier and speaker at each creature site.
 
-Some variables may be modified in the teensy_code.ino lines 60-69, such as startup audio volume, startup and shutdown hours, and if the system should start with a volume knob module attached or not (only for LONG). These variables can be modified using commands (see under) during runtime, but will always be reset to default after a reboot.
+Discrete analog envelope-follower/MOSFET circuit per creature (two BC547 transistors plus an IRL540 MOSFET) converting that creature's audio amplitude into LED strip brightness.
 
-### <ins>USB Commands</ins>
-Different commands are available to control and get feedback from the units:
+12V LED strip per creature (final installation voltage; breadboard testing done at 24V).
 
-| Key | Command | Description |
-|-----|---------|-------------|
-| `H` | `:help` | Displays a help message |
-| `R` | `:report` | Generate system report |
-| `B` | `:reboot` | Generate system reboot |
-| `W` | `:wakeup` | Wake up system |
-| `S` | `:sleep` | Put system to sleep |
-| `P` | `:play` | Play audio |
-| `!` | `:stop` | Stop audio |
-| `Z` | `:replay` | Replay audio |
-| `K` | `:toggle` | between USB or knob (A8) volume control |
-| `+` | `:volup` | Increase volume |
-| `-` | `:voldown` | Decrease volume |
-|  |`:volume x.x`  | adjust volume, takes float between 0.0 and 1.0 (ex ":volume 0.6") |
-| `>` | `:pwmup` | Increase PWM range |
-| `<` | `:pwmdown` | Decrease PWM range |
-|  | `:ledx` | Toggle individual LEDs with an int from 0 to 15|
-||`:seashell`| From LONG player only, calls for a report from seashell|
-||`:small`| From LONG player only, calls for a report from small|
+Drawio, for diagrams:
+Signal path
+Pd plays three looping audio files, one per creature, out through three channels of the HiFiBerry DAC. Each unbalanced line passes through a Neutrik transformer to balance it for the long underground Cat6 run to that creature's location. At the far end, a second Neutrik transformer converts the signal back to unbalanced before it reaches that creature's amplifier and speaker.
+Audio-to-light circuit
+Each creature also has its own analog circuit converting its audio channel's amplitude into LED brightness, independent of the main speaker signal path. Two BC547 stages provide double inversion to restore correct polarity, feeding a half-wave rectifier and then the IRL540 MOSFET gate, which switches the 12V LED strip. Wiring convention: MOSFET drain to LED strip negative, source to GND. Target envelope decay is 100 to 200ms.
+Status: in progress. Pending items include resolving gate voltage headroom on the envelope-follower output, confirming correct MOSFET orientation in the final build, and moving from the 24V breadboard test supply to the 12V installation supply. A professional circuit design was also commissioned in parallel and may be evaluated against this build.
+Pure Data patch
+Main patch: pd_codebase/main.pd, run in nogui mode.
 
-LONG passes USB commands further to SEASHELL and SMALL, but USB commands ran locally on SMALL or SEASHELL will not be passed to other units.
+Loops playback continuously; prints a status line at the start of each loop, captured by the terminal/log rather than the patch itself doing timestamping.
 
-### <ins>Diagram</ins>
-A flowchart diagram can be found at `./flowchart diagram.drawio` or `./flowchart diagram.pdf`, and runs on a free software called drawio, also available as a web version at [https://app.diagrams.net/](https://app.diagrams.net/).
+Elapsed time within each loop is tracked via zexy's realtime object, converted to mn:ss:ms via expr and sprintf, and reset at the start of each playback cycle (roughly every 6 minutes).
 
-### <ins>Pinout</ins>
-|Digital Pin| Analog| Description|
-|-----------|----------|------------|
-| 0 | - | Must be NC, used for USB Serial |
-| 1 | - | Must be NC, used for USB Serial |
-| 2 | - | LED_1 |
-| 3 | - | LED_2 |
-| 4 | - | LED_3 |
-| 5 | - | LED_4 |
-| 6 | - | PWM_OUT (LED strip control) |
-| 7 | - | Can be used as backup receiver for Serial2 instead of Serial3 |
-| 8 | - | Can be used as backup transmitter for Serial2 instead of Serial3 |
-| 9 | - | Unused / NC  |
-| 10 | - | SDCARD_CS_PIN (SD card) |
-| 11 | - | SDCARD_MOSI_PIN (SD card) |
-| 12 | - | Unused / NC |
-| 13 | - | SDCARD_SCK_PIN (SD card) |
-| 14 | A0 | RX3 (receive serial on SM/SS, unused on LO) |
-| 15 | A1 | TX3 (send serial on LO, unused on SM/SS) |
-| 16 | - | REL_1 (relay on/off for speaker) |
-| 17 | - | REL_2 (relay on/off for 220V AC Live wire to the 36V DC PSU for the amplifier) |
-| 18 | - | SDA0 (RTC on LO, unused on SM/SS) |
-| 19 | - | SCL0 (RTC on LO, unused on SM/SS) |
-| 20 | - | LRCLK1 (audio) |
-| 21 | - | BCLK1 (audio) |
-| 22 | A8 | VOL_CTRL_PIN (analog volume control) |
-| 23 | - | MCLK (audio) |
-| 28 | - | PLAYED_ID (2, SS) |
-| 30 | - | PLAYER_ID (1, SM) |
-| 32 | - | PLAYER_ID (0, LO) |
+Remote control of the running patch (e.g. via Pd's netreceive) is possible but not yet implemented.
+Sleep/Wake schedule
+The Pi sleeps and wakes itself daily using its onboard RTC and battery, fully powering off rather than suspending. This requires POWER_OFF_ON_HALT=1 in the bootloader config, checked with sudo rpi-eeprom-config.
+The script /home/mike/sleep_pi.sh sets the next wake alarm and shuts the system down:
+#!/bin/bash
 
-### <ins>Toolkit required for maintenance</ins>
-Screwdrivers to open/close the boxes and fasten terminal blocks:
-+ Flat 3mm
-+ Flat 6mm
-+ Philips 6mm
+echo 0 > /sys/class/rtc/rtc0/wakealarm
 
-Screwdrivers to swap boards within the boxes:
-+ Philips 000 or Philips 00
-+ Hex/Wrench 4
-+ Hex/Wrench 4.5mm
+echo $(date -d "tomorrow 08:00" +%s) > /sys/class/rtc/rtc0/wakealarm
 
-Electrical components, tools and cables/adapters:
-+ Multimeter to test voltage, current and and continuity
-+ Wago connectors and crocodile cables to test temporary connections
-+ A pair of headphones with minijack to test audio output on teensy
-+ Computer with USB-A connector and Arduino + Teensyduino + specified libraries (see above) installed to upload new code
-+ One or several long USB-A extension cables and a dongle to connect the USB of all three systems to the computer
-+ An Arduino board (UNO for example) for tasks like reprogramming the clock
-+ Any serial monitor software over USB to monitor the systems
+/usr/sbin/shutdown -h now
+It must use the full path /usr/sbin/shutdown, since cron runs with a minimal PATH that doesn't include /usr/sbin.
+The script is triggered daily by root's crontab (sudo crontab -e). Current entry: 15 15 * * * /home/mike/sleep_pi.sh, meaning cron fires the sleep script at 15:15, and the script sets the wake alarm for 08:00 the next day. When changing sleep or wake times, update both the cron line and the date string in the script together, leaving a few minutes of margin between the cron trigger and the wake target.
+Autostart
+The Pi boots into the desktop automatically (autologin enabled via raspi-config, System Options, Boot/Auto Login, Desktop Autologin). On desktop load, labwc reads ~/.config/labwc/autostart, which contains:
+lxterminal -e "/usr/bin/pd -nogui /home/mike/Documents/suuret_muinaiset/pd_codebase/main.pd" &
+The trailing & is required so labwc doesn't wait for PD to exit before finishing desktop startup. This opens a visible terminal running PD, so a technician with a screen and keyboard can see live output directly, while remote access via Pi Connect or SSH works the same regardless.
+Daily cycle
+08:00, Pi wakes, boots to desktop, PD autostarts via labwc.
 
-Gaffer tape, zip ties and miscelaneous crimping tools can be helpful
+08:00 to 15:15, PD runs continuously, looping playback through all three channels.
+
+15:15, cron fires sleep_pi.sh, which sets the next wake alarm and shuts the Pi down fully.
+
+15:15 to 08:00, Pi is fully powered off.
+Toolkit required for maintenance
+Screwdrivers to open/close boxes and fasten terminal blocks: flat 3mm, flat 6mm, Philips 6mm.
+
+Multimeter to test voltage, current, and continuity.
+
+Oscilloscope, for checking envelope-follower and gate voltages on the analog LED circuits.
+
+Breadboard and Falstad simulator access, for testing/iterating on the analog circuit before field changes.
+
+Wago connectors and crocodile cables for temporary test connections.
+
+A pair of headphones with minijack, to test audio output directly from the Pi.
+
+HDMI cable, keyboard and mouse, for direct access to the Pi's desktop on site.
+
+Computer or laptop for SSH/Pi Connect access when remote troubleshooting is preferred over an on-site screen.
+
+Long Cat6 testing cable or cable tester, for diagnosing the underground transformer runs.
+Gaffer tape, zip ties, and miscellaneous crimping tools can be helpful.
