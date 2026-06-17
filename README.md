@@ -30,9 +30,7 @@ Pd plays three looping audio files, one per creature, out through three channels
 
 ## Audio-to-light circuit
 
-Each creature also has its own analog circuit converting its audio channel's amplitude into LED brightness, independent of the main speaker signal path. Two BC547 stages provide double inversion to restore correct polarity, feeding a half-wave rectifier and then the IRL540 MOSFET gate, which switches the 12V LED strip. Wiring convention: MOSFET drain to LED strip negative, source to GND. Target envelope decay is 100 to 200ms.
-
-Status: in progress. Pending items include resolving gate voltage headroom on the envelope-follower output, confirming correct MOSFET orientation in the final build, and moving from the 24V breadboard test supply to the 12V installation supply. A professional circuit design was also commissioned in parallel and may be evaluated against this build.
+Each creature also has its own analog circuit converting its audio channel's amplitude into LED brightness, independent of the main speaker signal path. In progress.
 
 ## Pure Data patch
 
