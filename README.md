@@ -75,6 +75,65 @@ The trailing & is required so labwc doesn't wait for PD to exit before finishing
 
 22:00 to 08:00, Pi is fully powered off.
 
+## Network Access
+
+The Pi 5 runs a permanent local WiFi access point via its onboard chip (wlan0), allowing on-site technicians to connect and SSH into the system without opening the enclosure or requiring venue network access.
+
+A USB WiFi dongle (wlan1) is available as a client interface. When remote support is needed, a technician can connect wlan1 to a phone hotspot via SSH, bringing the Pi online so that Pi Connect becomes available for remote access.
+
+### Access point details
+
+SSID: HUOLTO-01 (hidden, not broadcast)
+Security: WPA2
+Credentials: see project password manager
+
+### Connecting
+
+Connect to HUOLTO-01 from a device with an SSH client. The Pi is reachable at 10.42.0.1 (NetworkManager hotspot default).
+
+```
+ssh ant1@10.42.0.1
+```
+
+### Enabling remote access on-site
+
+Once connected via SSH over the AP, connect wlan1 to a hotspot:
+
+```
+sudo nmcli dev wifi connect "HotspotName" password "hotspotpassword" ifname wlan1
+```
+
+Pi Connect will become available automatically once wlan1 has internet.
+
+---
+
+## Pure Data — Command Line Options
+
+The installation launches Pd headless with explicit audio configuration flags set in the autostart command, rather than relying on Pd's saved preferences. This ensures consistent behaviour across reboots and system changes.
+
+Current launch flags:
+
+```
+pd -nogui -alsa -alsaadd snd_rpi_hifiberry_dac8x -outchannels 8 -noadc -nomidi -r 44100 -blocksize 512 -audiobuf 25 -noprefs -open /path/to/patch.pd
+```
+
+Flag summary:
+
+| Flag | Purpose |
+|---|---|
+| `-nogui` | Headless operation |
+| `-alsa` | Force ALSA audio API |
+| `-alsaadd snd_rpi_hifiberry_dac8x` | Pin HiFiBerry DAC8x by name (stable across reboots) |
+| `-outchannels 8` | Open all 8 DAC channels |
+| `-noadc` | Disable audio input |
+| `-nomidi` | Disable MIDI |
+| `-r 44100` | Sample rate |
+| `-blocksize 512` | DSP block size in samples |
+| `-audiobuf 25` | Audio I/O buffer in milliseconds |
+| `-noprefs` | Ignore saved Pd preferences; command line is authoritative |
+
+Full reference for Pd command line options: https://puredata.info/docs/faq/commandline
+
 ## Toolkit required for maintenance
 
 Screwdrivers to open/close boxes and fasten terminal blocks: flat 3mm, flat 6mm, Philips 6mm.
