@@ -48,10 +48,12 @@ The Pi sleeps and wakes itself daily using its onboard RTC and battery, fully po
 
 The script /home/mike/sleep_pi.sh sets the next wake alarm and shuts the system down:
 
+```
 #!/bin/bash
 echo 0 > /sys/class/rtc/rtc0/wakealarm
 echo $(date -d "tomorrow 08:00" +%s) > /sys/class/rtc/rtc0/wakealarm
 /usr/sbin/shutdown -h now
+```
 
 It must use the full path /usr/sbin/shutdown, since cron runs with a minimal PATH that doesn't include /usr/sbin.
 
@@ -61,7 +63,9 @@ The script is triggered daily by root's crontab (sudo crontab -e). Current entry
 
 The Pi boots into the desktop automatically (autologin enabled via raspi-config, System Options, Boot/Auto Login, Desktop Autologin). On desktop load, labwc reads ~/.config/labwc/autostart, which contains:
 
+```
 lxterminal -e "/usr/bin/pd -nogui /home/mike/Documents/suuret_muinaiset/pd_codebase/main.pd" &
+```
 
 The trailing & is required so labwc doesn't wait for PD to exit before finishing desktop startup. This opens a visible terminal running PD, so a technician with a screen and keyboard can see live output directly, while remote access via Pi Connect or SSH works the same regardless.
 
@@ -76,38 +80,34 @@ The trailing & is required so labwc doesn't wait for PD to exit before finishing
 22:00 to 08:00, Pi is fully powered off.
 
 ## Network Access
+The Pi runs a permanent local WiFi access point (wlan0) for on-site wireless maintenance (without opening the enclosure). A USB WiFi dongle (wlan1) is available to bring the Pi online when remote support over internet (pi-connect service) is needed.
 
-The Pi 5 runs a permanent local WiFi access point via its onboard chip (wlan0), allowing on-site technicians to connect and SSH into the system without opening the enclosure or requiring venue network access.
-
-A USB WiFi dongle (wlan1) is available as a client interface. When remote support is needed, a technician can connect wlan1 to a phone hotspot via SSH, bringing the Pi online so that Pi Connect becomes available for remote access.
-
-### Access point details
-
-SSID: HUOLTO-01 (hidden, not broadcast)
+### WiFi Access point details
+The SSID is hidden, as to prevent for random connections. 
+SSID: HUOLTOVERKOSTO (hidden, not broadcast)
 Security: WPA2
-Credentials: see project password manager
+Password: see project credentials
 
-### Connecting
-
-Connect to HUOLTO-01 from a device with an SSH client. The Pi is reachable at 10.42.0.1 (NetworkManager hotspot default).
+### SSH connection on-site
+On your laptop (Mac or Windows), open WiFi settings and manually join the hidden network HUOLTOVERKOSTO.
+Open a terminal application (Mac: Terminal app / Windows: PowerShell), type the following and press Enter:
 
 ```
-ssh ant1@10.42.0.1
+ssh mike@10.42.0.1
 ```
+
+Enter the Pi password when prompted. You now have full shell access to the system via bash.
 
 ### Enabling remote access on-site
-
-Once connected via SSH over the AP, connect wlan1 to a hotspot:
+If remote support from the development team is needed, the Pi must be connected to the internet. Get in touch in advance so everyone involved can plan for a maintenance session. Once you have SSH access (see above), connect the Pi to a phone hotspot (replace "hot_spot_name" and "hot_spot_password" with your phone hotspot credentials):
 
 ```
-sudo nmcli dev wifi connect "HotspotName" password "hotspotpassword" ifname wlan1
+sudo nmcli dev wifi connect "hot_spot_name" password "hot_spot_password" ifname wlan1
 ```
 
-Pi Connect will become available automatically once wlan1 has internet.
+Pi-Connect will become available to the development team automatically once wlan1 has internet access.
 
----
-
-## Pure Data — Command Line Options
+## Pure Data - Command Line Options
 
 The installation launches Pd headless with explicit audio configuration flags set in the autostart command, rather than relying on Pd's saved preferences. This ensures consistent behaviour across reboots and system changes.
 
