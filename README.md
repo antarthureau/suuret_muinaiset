@@ -18,11 +18,11 @@ Cat6 cable, run underground, carrying the balanced signal to each creature's sit
 
 Amplifier and speaker at each creature site.
 
-Discrete analog envelope-follower/MOSFET circuit per creature (two BC547 transistors plus an IRL540 MOSFET) converting that creature's audio amplitude into LED strip brightness.
+Custom analog PCB per creature: envelope-follower circuit based on TL072 and TL071 op-amps with an IRL540 MOSFET, converting that creature's audio amplitude into LED strip brightness.
 
-12V LED strip per creature (final installation voltage)
+12V LED strip per creature (final installation voltage).
 
-2* SMPS per unit: 36VDC for the amplifier and 12VDC for the LED strips.
+2× SMPS per unit: 36VDC for the amplifier and 12VDC for the LED circuit PCB and LED strips. On the LONG unit, the PCB also carries an on-board Traco DC-DC converter providing 5V to power the Raspberry Pi from the 12V supply rail; this component is not populated on the SMALL and SEASHELL boards.
 
 ## Signal path
 
@@ -30,7 +30,21 @@ Pd plays three looping audio files, one per creature, out through three channels
 
 ## Audio-to-light circuit
 
-Each creature also has its own analog circuit converting its audio channel's amplitude into LED brightness, independent of the main speaker signal path. In progress.
+Each creature has a custom PCB (ordered from JLCPCB) that converts its audio channel's amplitude into a brightness level for its 12V LED strip, independently of the speaker signal path.
+
+Signal path through the circuit:
+
+Audio arrives at an RCA connector and passes through a 1µF capacitor (AC coupling, blocking any DC offset) into a bias network — a 100kΩ/100kΩ resistor divider sets a +6V virtual midpoint from the 12V supply, centering the signal for single-supply op-amp operation.
+
+The first TL072 half (U1A) buffers the input. The second TL072 half (U1B) amplifies the signal; gain is set by a 1MΩ feedback resistor and a 100kΩ trimmer potentiometer.
+
+A 1N4148 diode half-wave rectifies the amplified AC signal into a positive envelope voltage. Two 100kΩ trimmer potentiometers control attack time (how fast the envelope rises with loud transients) and decay time (how slowly it falls when sound stops). A 4.7µF capacitor holds the peak level between transients.
+
+A TL071 (U2) buffers the envelope voltage, isolating the capacitor from the output stage.
+
+An IRL540 power MOSFET (Q1) is driven through a 100Ω gate resistor. A 10kΩ pull-down resistor on the gate ensures the MOSFET turns fully off when the signal drops to zero. The MOSFET switches the 12V LED strip current in proportion to the envelope voltage.
+
+Power input is protected against reverse polarity by a 1N4007 diode. On the LONG unit PCB only, a Traco DC-DC converter provides a regulated 5V output used to power the Raspberry Pi from the 12V supply rail. This component is not populated on the SMALL and SEASHELL boards.
 
 ## Pure Data patch
 
@@ -64,16 +78,16 @@ The script is triggered daily by root's crontab (sudo crontab -e). Current entry
 The Pi boots into the desktop automatically (autologin enabled via raspi-config, System Options, Boot/Auto Login, Desktop Autologin). On desktop load, labwc reads ~/.config/labwc/autostart, which contains:
 
 ```
-lxterminal -e "/usr/bin/pd -nogui /home/mike/Documents/suuret_muinaiset/pd_codebase/main.pd" &
+lxterminal -e "/usr/bin/pd -nogui -alsa -alsaadd snd_rpi_hifiberry_dac8x -outchannels 8 -noadc -nomidi -r 44100 -blocksize 512 -audiobuf 25 -noprefs -open /home/mike/Documents/suuret_muinaiset/pd_codebase/main.pd" &
 ```
 
-The trailing & is required so labwc doesn't wait for PD to exit before finishing desktop startup. This opens a visible terminal running PD, so a technician with a screen and keyboard can see live output directly, while remote access via Pi Connect or SSH works the same regardless.
+The trailing & is required so labwc doesn't wait for Pd to exit before finishing desktop startup. This opens a visible terminal running Pd, so a technician with a screen and keyboard can see live output directly, while remote access via Pi Connect or SSH works the same regardless.
 
 ### Daily cycle
 
-08:00, Pi wakes, boots to desktop, PD autostarts via labwc.
+08:00, Pi wakes, boots to desktop, Pd autostarts via labwc.
 
-08:00 to 22:00, PD runs continuously, looping playback through all three channels.
+08:00 to 22:00, Pd runs continuously, looping playback through all three channels.
 
 22:00, cron fires sleep_pi.sh, which sets the next wake alarm and shuts the Pi down fully.
 
@@ -83,7 +97,7 @@ The trailing & is required so labwc doesn't wait for PD to exit before finishing
 The Pi runs a permanent local WiFi access point (wlan0) for on-site wireless maintenance (without opening the enclosure). A USB WiFi dongle (wlan1) is available to bring the Pi online when remote support over internet (pi-connect service) is needed.
 
 ### WiFi Access point details
-The SSID is hidden, as to prevent for random connections. 
+The SSID is hidden, as to prevent for random connections.
 SSID: HUOLTOVERKOSTO (hidden, not broadcast)
 Security: WPA2
 Password: see project credentials
@@ -114,7 +128,7 @@ The installation launches Pd headless with explicit audio configuration flags se
 Current launch flags:
 
 ```
-pd -nogui -alsa -alsaadd snd_rpi_hifiberry_dac8x -outchannels 8 -noadc -nomidi -r 44100 -blocksize 512 -audiobuf 25 -noprefs -open /path/to/patch.pd
+pd -nogui -alsa -alsaadd snd_rpi_hifiberry_dac8x -outchannels 8 -noadc -nomidi -r 44100 -blocksize 512 -audiobuf 25 -noprefs -open /home/mike/Documents/suuret_muinaiset/pd_codebase/main.pd
 ```
 
 Flag summary:
@@ -142,13 +156,13 @@ Multimeter to test voltage, current, and continuity.
 
 Wago connectors and crocodile cables for temporary test connections.
 
-A pair of headphones with minijack, to test audio output directly from the Pi (DAC 5/6)
+A pair of headphones with minijack, to test audio output directly from the Pi (DAC 5/6).
 
 HDMI cable, screen, keyboard and mouse, for direct access to the Pi's desktop on site.
 
 Computer or laptop for SSH/Pi Connect access when remote troubleshooting is preferred over an on-site screen.
 
-A smartphone with hotspot to connect the Pi to the wifi, allowing remote control via Pi-Connect
+A smartphone with hotspot to connect the Pi to the wifi, allowing remote control via Pi-Connect.
 
 Long Cat6 testing cable or cable tester, for diagnosing the underground transformer runs.
 
