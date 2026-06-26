@@ -1,0 +1,21 @@
+#include "StatusLeds.h"
+#include "config.h"
+
+void StatusLeds::begin() {
+  for (uint8_t i = 0; i < 4; i++) {
+    pinMode(cfg::LED_PINS[i], OUTPUT);
+    digitalWrite(cfg::LED_PINS[i], LOW);
+  }
+}
+
+void StatusLeds::pattern(bool b3, bool b2, bool b1, bool b0) {
+  const bool v[4] = { b3, b2, b1, b0 };
+  for (uint8_t i = 0; i < 4; i++) digitalWrite(cfg::LED_PINS[i], v[i]);
+}
+
+void StatusLeds::show(int code) {
+  if (code < 0 || code > 15) return;
+  bool bits[4];
+  for (int i = 3; i >= 0; i--) { bits[i] = (code & 1); code >>= 1; }
+  pattern(bits[0], bits[1], bits[2], bits[3]);
+}
