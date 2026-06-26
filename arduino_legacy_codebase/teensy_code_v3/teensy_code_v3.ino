@@ -1,5 +1,5 @@
 /*
-  Suuret Muinaiset - V2 firmware (Teensy 4.0)
+  Suuret Muinaiset - V3 firmware (Teensy 4.0)
   Sound-to-light installation, Turku.
 
   3 identical units, role chosen by hardware ID strap pins:
