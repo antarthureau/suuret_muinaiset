@@ -94,32 +94,72 @@ The trailing & is required so labwc doesn't wait for Pd to exit before finishing
 22:00 to 08:00, Pi is fully powered off.
 
 ## Network Access
-The Pi runs a permanent local WiFi access point (wlan0) for on-site wireless maintenance (without opening the enclosure). A USB WiFi dongle (wlan1) is available to bring the Pi online when remote support over internet (pi-connect service) is needed.
 
-### WiFi Access point details
-The SSID is hidden, as to prevent for random connections.
-SSID: HUOLTOVERKOSTO (hidden, not broadcast)
+The Pi has three network interfaces, each serving a different purpose:
+
+wlan0 — onboard WiFi, configured as a permanent hidden-SSID access point. Used for on-site wireless maintenance without opening the enclosure. No internet access.
+
+eth0 — wired ethernet, static IP. Used for a direct on-site cable connection when WiFi isn't practical or reliable enough.
+
+wlan1 — USB WiFi dongle (D-Link AC13U). Connects outward to an external network (e.g. a phone hotspot) to bring the Pi online, which is required for Pi Connect remote support.
+
+Pick the option below that matches your situation.
+
+### Option 1: WiFi access point (on-site, no cable needed)
+
+SSID: HUOLTO-NETT (hidden, not broadcast)
 Security: WPA2
 Password: see project credentials
+Static IP: 10.42.0.1
 
-### SSH connection on-site
-On your laptop (Mac or Windows), open WiFi settings and manually join the hidden network HUOLTOVERKOSTO.
-Open a terminal application (Mac: Terminal app / Windows: PowerShell), type the following and press Enter:
+On your laptop, open WiFi settings and manually join the hidden network HUOLTO-NETT (you'll need to enter the SSID by name since it won't appear in scan results). Set your laptop's WiFi interface to a static IP on the same subnet, e.g. 10.42.0.50 / 255.255.255.0.
 
+Then:
 ```
 ssh mike@10.42.0.1
 ```
 
-Enter the Pi password when prompted. You now have full shell access to the system via bash.
+### Option 2: Wired ethernet (on-site, direct cable)
 
-### Enabling remote access on-site
-If remote support from the development team is needed, the Pi must be connected to the internet. Get in touch in advance so everyone involved can plan for a maintenance session. Once you have SSH access (see above), connect the Pi to a phone hotspot (replace "hot_spot_name" and "hot_spot_password" with your phone hotspot credentials):
+Static IP: 10.42.1.2
 
+Connect a Cat6 cable directly between your laptop's ethernet port (or USB/Thunderbolt-to-RJ45 adapter) and the Pi's ethernet port. Set your laptop's ethernet interface to a static IP on the same subnet, e.g. 10.42.1.50 / 255.255.255.0.
+
+Then:
 ```
-sudo nmcli dev wifi connect "hot_spot_name" password "hot_spot_password" ifname wlan1
+ssh mike@10.42.1.2
 ```
 
-Pi-Connect will become available to the development team automatically once wlan1 has internet access.
+Useful when WiFi conditions on-site are poor, or as a fallback if the access point config is ever broken and needs fixing from scratch.
+
+### Option 3: Internet access for remote support (wlan1)
+
+If remote support from the development team is needed, wlan1 must be connected to an internet-providing WiFi network (e.g. a phone hotspot). Get in touch with the development team in advance so everyone involved can plan for a maintenance session.
+
+Once you have SSH access via Option 1 or 2 above, connect wlan1:
+```
+sudo nmcli device wifi connect "hotspot_name" password "hotspot_password" ifname wlan1
+```
+
+If the hotspot password contains special characters, use single quotes instead of double quotes around it, otherwise the shell may misinterpret characters like $ or ( ) before nmcli ever sees them:
+```
+sudo nmcli device wifi connect "hotspot_name" password 'hotspot_password' ifname wlan1
+```
+
+If the target network doesn't show up in a scan (common with iPhone hotspots, which only broadcast while the Personal Hotspot screen is actively open), create the connection manually instead:
+```
+sudo nmcli connection add type wifi ifname wlan1 con-name "hotspot_name" ssid "hotspot_name"
+sudo nmcli connection modify "hotspot_name" wifi-sec.key-mgmt wpa-psk
+sudo nmcli connection modify "hotspot_name" wifi-sec.psk 'hotspot_password'
+sudo nmcli connection up "hotspot_name"
+```
+
+Pi Connect becomes available to the development team automatically once wlan1 has internet access. Check status with:
+```
+rpi-connect status
+```
+
+Note: the D-Link dongle is currently running on its default in-kernel driver (rtl8xxxu), not the DKMS RTL8192EU driver. This works for now but hasn't been validated for long-term stability — see Key learnings for follow-up.
 
 ## Pure Data - Command Line Options
 
@@ -161,6 +201,8 @@ A pair of headphones with minijack, to test audio output directly from the Pi (D
 HDMI cable, screen, keyboard and mouse, for direct access to the Pi's desktop on site.
 
 Computer or laptop for SSH/Pi Connect access when remote troubleshooting is preferred over an on-site screen.
+
+Ethernet cable (Cat6) and a USB/Thunderbolt-to-RJ45 adapter if your laptop lacks a built-in ethernet port, for wired on-site access.
 
 A smartphone with hotspot to connect the Pi to the wifi, allowing remote control via Pi-Connect.
 
