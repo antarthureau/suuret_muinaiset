@@ -6,9 +6,7 @@
  * subsystems, so this file stays trivial.
  *
  * Build:
- *   PlatformIO  -> builds this file directly (see platformio.ini).
- *   Arduino IDE -> rename this file to <foldername>.ino and keep the other
- *                  .h/.cpp files alongside it in the sketch folder.
+ *   Open Arduino IDE, select Teensy 4.1 as the board, select which board to upload to, and click Upload.
  */
 #include "Controller.h"
 

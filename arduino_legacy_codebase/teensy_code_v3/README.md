@@ -1,4 +1,4 @@
-# Suuret Muinaiset - V2 firmware
+# Suuret Muinaiset - V3 firmware
 
 Teensy 4.0 firmware for the 3-unit sound-and-light installation. All three
 units run identical firmware; the role (leader / follower) is selected by
@@ -20,19 +20,6 @@ platformio.ini      PlatformIO build
 
 `Controller` owns one instance of every subsystem. `main.cpp` creates one
 `Controller` and forwards `setup()` / `loop()` to it. Nothing else is global.
-
-## Build
-
-PlatformIO (recommended for the flat layout):
-
-```
-pio run            # compile
-pio run -t upload  # flash the connected Teensy
-pio device monitor -b 9600
-```
-
-Arduino IDE: rename `main.cpp` to `<foldername>.ino`, put every file in that
-sketch folder, install RTClib via Library Manager, build with Teensyduino.
 
 ## Serial protocol (Serial3)
 
