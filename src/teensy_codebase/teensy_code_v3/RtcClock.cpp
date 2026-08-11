@@ -1,16 +1,23 @@
+/**
+ * RtcClock.cpp - DS3231 wrapper implementation.
+ * See RtcClock.h for why the stored time is preserved rather than overwritten.
+ */
 #include "RtcClock.h"
 
 bool RtcClock::begin() {
   ok_ = rtc_.begin();
   if (!ok_) return false;
 
+  /*
+   * lostPower() means the backup cell failed at some point. That does not by
+   * itself make the stored time wrong, so only replace it when the year is
+   * implausible. A unit that reports this on every boot needs a new coin cell.
+   */
   if (rtc_.lostPower()) {
     DateTime n = rtc_.now();
-    if (n.year() < 2024) {
+    if (n.year() < 2026) {
       rtc_.adjust(DateTime(F(__DATE__), F(__TIME__)));   // last-resort fallback
     }
-    // else: backup time looks plausible, keep it. A repeated lostPower()
-    // means the DS3231 coin cell is dead or missing - replace it.
   }
   return true;
 }
@@ -20,7 +27,7 @@ uint8_t RtcClock::hour() {
 }
 
 bool RtcClock::isActiveHour(uint8_t startHour, uint8_t endHour) {
-  if (!ok_) return false;
+  if (!ok_) return false;      // unknown time: stay asleep
   uint8_t h = rtc_.now().hour();
   return (h >= startHour && h < endHour);
 }

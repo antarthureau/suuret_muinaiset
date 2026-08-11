@@ -1,3 +1,7 @@
+/**
+ * StatusLeds.cpp - implementation of the 4-LED binary status display.
+ * See StatusLeds.h for the encoding and why it must not change.
+ */
 #include "StatusLeds.h"
 #include "config.h"
 
@@ -15,6 +19,11 @@ void StatusLeds::pattern(bool b3, bool b2, bool b1, bool b0) {
 
 void StatusLeds::show(int code) {
   if (code < 0 || code > 15) return;
+
+  /*
+   * Decompose least-significant bit first into bits[3]..bits[0], so that
+   * bits[0] ends up holding bit 3. pattern() then receives them MSB first.
+   */
   bool bits[4];
   for (int i = 3; i >= 0; i--) { bits[i] = (code & 1); code >>= 1; }
   pattern(bits[0], bits[1], bits[2], bits[3]);
