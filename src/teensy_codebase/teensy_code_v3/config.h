@@ -12,7 +12,11 @@
 
 // Set to 0 to build without the hardware watchdog (e.g. if Watchdog_t4 is
 // not installed). With 1, any hang self-recovers after WDT_TIMEOUT_S.
-#define USE_WATCHDOG 1
+//
+// !!! TEMPORARILY 0 FOR THE AUDIO-DISTORTION LOGGING SESSION !!!
+// A hang will NOT self-recover while this is 0. Set it back to 1 before the
+// units are left running unattended.
+#define USE_WATCHDOG 0
 
 namespace cfg {
   // ---- hardware ID strap pins (HIGH selects the role) ----
