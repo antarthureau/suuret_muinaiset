@@ -67,6 +67,7 @@ private:
   // timers
   elapsedMillis statusTimer_, heartTimer_, pollTimer_;
   elapsedMillis linkTimer_, gapTimer_, retryTimer_, pwmTimer_;
+  elapsedMillis dbgTimer_;      // 1 Hz audio-health line while the leader plays
 
 #if USE_WATCHDOG
   WDT_T4<WDOG1> wdt_;

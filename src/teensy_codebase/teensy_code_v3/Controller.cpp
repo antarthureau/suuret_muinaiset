@@ -270,6 +270,17 @@ void Controller::leaderTask() {
       if (knob_) volumeFromKnob();
       leds_.show(status::PLAYING);
       gapTimer_ = 0;
+
+      // 1 Hz audio-health trace. mem approaching the AudioMemory() ceiling,
+      // or t stalling between lines, means real playback starvation; flat
+      // mem through an audible episode means the fault is not buffering.
+      if (dbgTimer_ >= 1000) {
+        dbgTimer_ = 0;
+        Serial.printf("t=%lu mem=%u cpu=%.1f\n",
+                      (unsigned long)audio_.posMs(),
+                      AudioEngine::memMax(), AudioEngine::cpuMax());
+        AudioEngine::statsReset();
+      }
     }
   } else {
     if (audio_.isPlaying()) audio_.stop();

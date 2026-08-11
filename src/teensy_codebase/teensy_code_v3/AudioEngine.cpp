@@ -4,7 +4,9 @@
 #include <SD.h>
 
 void AudioEngine::begin(float volume) {
-  AudioMemory(60);                 // generous slack against SD read latency
+  // Headroom against SD read-latency spikes. Watch memMax() in the leader's
+  // debug line: if it climbs toward this ceiling, playback is starving.
+  AudioMemory(120);
 
   codecOk_ = sgtl_.enable();
   volume_  = volume;

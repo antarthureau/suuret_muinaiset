@@ -28,6 +28,16 @@ public:
   // Current envelope 0.0-1.0, or -1.0 if no new sample is available.
   float level(bool peak);
 
+  // ---- diagnostics ----
+  // Position in the file currently playing, ms.
+  uint32_t posMs() { return wav_.positionMillis(); }
+  // Peak audio blocks in use since the last reset. The ceiling is the value
+  // passed to AudioMemory() in begin(); approaching it means starvation.
+  static uint8_t memMax() { return AudioMemoryUsageMax(); }
+  // Peak audio-ISR load since the last reset, percent.
+  static float   cpuMax() { return AudioProcessorUsageMax(); }
+  static void    statsReset() { AudioMemoryUsageMaxReset(); AudioProcessorUsageMaxReset(); }
+
 private:
   AudioPlaySdWav       wav_;
   AudioAnalyzePeak     peak_;
