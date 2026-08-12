@@ -35,11 +35,28 @@
  * With 0, every watchdog reference compiles out and the library is not
  * needed at all.
  *
- * !!! TEMPORARILY 0 FOR THE AUDIO-DISTORTION LOGGING SESSION !!!
  * A hang will NOT self-recover while this is 0. Set it back to 1 before the
  * units are left running unattended on site.
  */
-#define USE_WATCHDOG 0
+#define USE_WATCHDOG 1
+
+/**
+ * Leader audio-health trace toggle.
+ *
+ * Gates the leader's 1 Hz Serial.printf trace in leaderTask() - the line that
+ * reports playback position, peak audio-block usage and peak audio-ISR load
+ * while a round is playing.
+ *
+ * With 0 the whole block compiles out and the USB console stays quiet, which
+ * is what you want in normal field operation: the trace otherwise emits a line
+ * every second for the entire playing day.
+ *
+ * Flip to 1 when chasing an audio or CPU problem, then read the output as
+ * described in the README. mem climbing toward cfg::AUDIO_MEMORY_BLOCKS, or t
+ * failing to advance by roughly 1000 between lines, means the SD path is
+ * starving rather than the fault sitting downstream in the analog chain.
+ */
+#define AUDIO_TRACE 0
 
 namespace cfg {
 
@@ -111,6 +128,22 @@ namespace cfg {
   constexpr uint8_t SD_SCK  = 13;
 
   /**
+   * Audio buffering, passed to AudioMemory() at startup.
+   *
+   * The Teensy audio library works in fixed blocks of 128 samples - one block
+   * is 2.9 ms of audio at 44.1 kHz - drawn from a single static pool shared by
+   * every object in the graph. This value sets how many blocks that pool
+   * holds, so it is the ceiling that memMax() is reported against.
+   *
+   * It is set well above what the graph strictly needs, as headroom against SD
+   * read-latency spikes: a card that stalls briefly can be ridden out from the
+   * buffer instead of producing a dropout. The Teensy 4 has RAM to spare, so
+   * the margin is cheap. If memMax() ever climbs toward this number during
+   * playback, the card is not keeping up.
+   */
+  constexpr uint8_t AUDIO_MEMORY_BLOCKS = 120;
+
+  /**
    * Volume.
    *
    * DEFAULT_VOLUME is applied at every boot; the knob and the serial +/- keys
@@ -167,14 +200,49 @@ namespace cfg {
   constexpr uint16_t RETRY_INTERVAL_MS = 3000;
   constexpr uint8_t  RETRY_MAX         = 20;
 
-  /** Diagnostics: interval of the leader's audio-health trace while playing. */
+  /**
+   * Diagnostics: interval of the leader's audio-health trace while playing.
+   * Only compiled in when AUDIO_TRACE is 1.
+   */
   constexpr uint16_t DEBUG_TRACE_MS = 1000;
+
+  /**
+   * Boot-time fault announcement on the LED array.
+   *
+   * Faults found during setup - no codec, no SD card, no RTC on the leader -
+   * are blinked on the status LEDs at the end of setup(), one code after
+   * another, before the unit settles into its normal state display.
+   *
+   * The blink is what makes them readable: a steady code would be
+   * indistinguishable from a normal state at a glance, and simply showing the
+   * code once was the old behaviour, where the first pass of loop() overwrote
+   * it within microseconds and a dead card read as a healthy sleeping unit.
+   *
+   * Faults are announced, not latched. A unit that has been running for hours
+   * displays its normal state, so to re-read the fault codes on site, reboot
+   * the unit - press B on the USB console or power-cycle it - and watch the
+   * array during startup.
+   *
+   * FAULT_BLINK_MS is per fault code, so a unit with all three faults spends
+   * three times this long announcing before it starts.
+   */
+  constexpr uint16_t FAULT_BLINK_MS      = 4000;   // per fault code
+  constexpr uint16_t FAULT_BLINK_HALF_MS = 250;    // on/off half-period
 
   /**
    * Audio files, 8.3 names on the SD card.
    *
-   * All three are 16-bit stereo PCM at 44.1 kHz, which is what AudioPlaySdWav
-   * supports. Only the left channel is played (see AudioEngine).
+   * All three are 16-bit PCM at 44.1 kHz, single channel. Mono is what the
+   * units actually run: the masters were re-rendered from the original
+   * two-channel files this year, and the deployed set lives in src/audio/mono/.
+   * The old 2-channel originals are kept in src/audio/stereo/ for reference
+   * only and must not be copied onto a card.
+   *
+   * That switch is what fixed the CPU spiking and audio glitches in the field.
+   * A stereo file costs roughly 176 KB/s off the card; the same content in
+   * mono costs 88, and the card is on SPI with no SDIO alternative on a Teensy
+   * 4.0. The channel routing in AudioEngine was never the issue - it only ever
+   * read output 0 - which is why the fix needed no firmware change at all.
    */
   constexpr char FILE_LONG[]     = "LONG.WAV";
   constexpr char FILE_SMALL[]    = "SMALL.WAV";

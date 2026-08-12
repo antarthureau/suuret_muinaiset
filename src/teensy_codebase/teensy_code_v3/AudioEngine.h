@@ -12,16 +12,30 @@
  *                      |
  *                      +--> rms_      (alternative envelope)
  *
- * The WAV files are 16-bit stereo PCM at 44.1 kHz, but only output 0 - the
- * left channel - is used. It is fanned out to both I2S channels so the same
+ * The WAV files are 16-bit single-channel mono PCM at 44.1 kHz. Output 0
+ * carries that audio, and it is fanned out to both I2S channels so the same
  * signal reaches the amplifier regardless of which side of the minijack is
  * wired, and to both analyzers so the light follows exactly what is heard.
- * The right channel of the file is never read.
  *
- * That is a deliberate decision from the original build, not an oversight.
- * It does mean any stereo content in the right channel is silently discarded,
- * so the files are expected to be dual mono. Worth re-checking after any
- * re-render: LONG.WAV in particular has measurably decorrelated channels.
+ * The graph has always read output 0 only, so it needed no change when the
+ * masters moved from two-channel to true mono - see the note below on why that
+ * move mattered anyway.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE FILES ARE MONO
+ * ---------------------------------------------------------------------------
+ * The masters were originally two-channel, and this class read only the left
+ * of the pair. That was harmless in itself but not free: samples in a WAV are
+ * interleaved L,R,L,R, so the right channel still had to be pulled off the
+ * card to reach the left one. A stereo file therefore cost roughly 176 KB/s of
+ * SD bandwidth to deliver 88 KB/s of audio.
+ *
+ * Re-rendering the masters to single-channel mono halved that read rate, and
+ * that is what resolved the CPU spiking and audio glitches observed in the
+ * field. The fix was entirely in the media, not the firmware.
+ *
+ * The deployed files live in src/audio/mono/. The old two-channel originals
+ * are kept in src/audio/stereo/ for reference and must not go on a card.
  *
  * ---------------------------------------------------------------------------
  * WHERE THE SD READS HAPPEN
@@ -97,16 +111,16 @@ public:
    * is the codec output, the wiring or the amplifier.
    * --------------------------------------------------------------------- */
 
-  /** Position within the file currently playing, in milliseconds. */
+  // Position within the file currently playing, in milliseconds.
   uint32_t posMs() { return wav_.positionMillis(); }
 
-  /** Peak audio blocks in use since the last reset. Ceiling = AudioMemory(). */
+  // Peak audio blocks in use since the last reset. Ceiling = AudioMemory().
   static uint8_t memMax() { return AudioMemoryUsageMax(); }
 
-  /** Peak audio-interrupt load since the last reset, percent. */
+  // Peak audio-interrupt load since the last reset, percent.
   static float cpuMax() { return AudioProcessorUsageMax(); }
 
-  /** Clear both peaks, so the next reading covers only the next interval. */
+  // Clear both peaks, so the next reading covers only the next interval.
   static void statsReset() {
     AudioMemoryUsageMaxReset();
     AudioProcessorUsageMaxReset();

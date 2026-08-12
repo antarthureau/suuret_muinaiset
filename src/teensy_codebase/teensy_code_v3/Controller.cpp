@@ -97,13 +97,17 @@ void Controller::setup() {
   analogWriteResolution(8);
   analogWrite(cfg::PWM_PIN, 0);
 
-  /* Init is non-fatal: report what failed and carry on. */
+  /*
+   * Init is non-fatal: report what failed and carry on. The LED array is not
+   * written here - announceFaults() does it at the end of setup, because
+   * anything shown now would be overwritten by the first pass of loop().
+   */
   audio_.begin(cfg::DEFAULT_VOLUME);
-  if (!audio_.codecReady()) { Serial.println("codec fail"); leds_.show(status::CODEC_ERR); }
-  if (!audio_.sdReady())    { Serial.println("SD fail");    leds_.show(status::SD_ERR); }
+  if (!audio_.codecReady()) Serial.println("codec fail");
+  if (!audio_.sdReady())    Serial.println("SD fail");
 
   if (role_ == Role::LEADER) {
-    if (!rtc_.begin()) { Serial.println("RTC fail"); leds_.show(status::RTC_ERR); }
+    if (!rtc_.begin()) Serial.println("RTC fail");
   }
 
 #if USE_WATCHDOG
@@ -113,6 +117,58 @@ void Controller::setup() {
 #endif
 
   Serial.println("Setup complete.");
+
+  /* Last thing before loop() takes over the display. */
+  announceFaults();
+}
+
+/* ===========================================================================
+ * BOOT FAULT ANNOUNCEMENT
+ *
+ * Blink each fault found during setup on the LED array, long enough for a
+ * technician standing at an open enclosure to read it, then hand the display
+ * over to loop().
+ *
+ * Faults are announced rather than latched, so a unit that has been running
+ * for hours shows its normal state. To re-read them on site, reboot the unit
+ * and watch the array during startup.
+ *
+ * This blocks, deliberately: nothing is playing yet and no round has started,
+ * so the only cost is delaying the first loop() by a few seconds. The watchdog
+ * is fed throughout.
+ * ========================================================================= */
+
+void Controller::announceFaults() {
+  int faults[3];
+  int n = 0;
+
+  if (!audio_.codecReady())                 faults[n++] = status::CODEC_ERR;
+  if (!audio_.sdReady())                    faults[n++] = status::SD_ERR;
+  if (role_ == Role::LEADER && !rtc_.ok())  faults[n++] = status::RTC_ERR;
+
+  if (n == 0) return;                       // healthy unit: say nothing
+
+  Serial.print("Announcing ");
+  Serial.print(n);
+  Serial.println(" fault code(s) on the LED array.");
+
+  for (int i = 0; i < n; i++) {
+    bool on = true;
+    leds_.show(faults[i]);
+
+    elapsedMillis held  = 0;
+    elapsedMillis phase = 0;
+    while (held < cfg::FAULT_BLINK_MS) {
+      feedWdt();
+      if (phase >= cfg::FAULT_BLINK_HALF_MS) {
+        phase = 0;
+        on = !on;
+        leds_.show(on ? faults[i] : 0);     // code 0 is all LEDs off
+      }
+    }
+  }
+
+  leds_.show(0);
 }
 
 /* ===========================================================================
@@ -293,7 +349,8 @@ void Controller::dispatch(char cmd, const char *arg) {
     case proto::CMD_HELP:
       Serial.println(F("\nKeys: P play  X stop  W wake  S sleep  R report  B reboot"));
       Serial.println(F("      + - volume   > < PWM   K knob"));
-      Serial.println(F("      :settime YYYY MM DD HH MM SS   :synctime   :time"));
+      Serial.println(F("Clock:  :settime YYYY MM DD HH MM SS   :synctime   :time"));
+      Serial.println(F("Status (leader): :small   :seashell   :status"));
       break;
 
     default:
@@ -312,7 +369,24 @@ void Controller::handleFrame(const Frame &f) {
    */
   if (role_ == Role::LEADER) {
     if (f.addr == proto::ADDR_LEADER && f.cmd == proto::CMD_STATUS) {
-      Serial.print("Follower status: "); Serial.println(f.arg);
+      /*
+       * Followers send "role,awake,playing,temp". Label the fields rather than
+       * printing raw CSV: this is what a technician reads on site, and the
+       * automatic poll prints it unprompted every 20 s.
+       */
+      int fr = -1, fa = -1, fp = -1;
+      float ft = 0.0f;
+      if (sscanf(f.arg, "%d,%d,%d,%f", &fr, &fa, &fp, &ft) == 4) {
+        Serial.print("Status from ");
+        Serial.print(fr == (int)Role::SMALL ? "SMALL" :
+                     fr == (int)Role::SEASHELL ? "SEASHELL" : "?");
+        Serial.print(": awake ");   Serial.print(fa ? "YES" : "NO");
+        Serial.print(", playing "); Serial.print(fp ? "YES" : "NO");
+        Serial.print(", CPU ");     Serial.print(ft);
+        Serial.println(" C");
+      } else {
+        Serial.print("Follower status (unparsed): "); Serial.println(f.arg);
+      }
     }
     return;
   }
@@ -374,6 +448,37 @@ void Controller::usbPoll() {
       Serial.print("RTC = compile time "); rtc_.print(Serial);
     } else if (strncmp(line, "time", 4) == 0) {
       rtc_.print(Serial);
+
+    /*
+     * On-demand status requests, leader only. V2 had these as :small and
+     * :seashell and the names are kept, but the mechanism is different: the
+     * frame is addressed, so the follower that was not asked simply stays
+     * quiet. V2 had to call Serial3.end() on the other unit for 250 ms to
+     * keep it off the shared back-channel.
+     *
+     * Replies are asynchronous. They arrive on Serial3 a moment later and
+     * print from handleFrame(), not from here.
+     */
+    } else if (strncmp(line, "small", 5) == 0) {
+      if (role_ != Role::LEADER) { Serial.println("Leader only."); return; }
+      link_.send(proto::ADDR_SMALL, proto::CMD_REPORT, "");
+      Serial.println("Status requested from SMALL.");
+    } else if (strncmp(line, "seashell", 8) == 0) {
+      if (role_ != Role::LEADER) { Serial.println("Leader only."); return; }
+      link_.send(proto::ADDR_SEASHELL, proto::CMD_REPORT, "");
+      Serial.println("Status requested from SEASHELL.");
+    } else if (strncmp(line, "status", 6) == 0) {
+      if (role_ != Role::LEADER) { Serial.println("Leader only."); return; }
+      /*
+       * Ask both, reusing the staggered poll sequence in leaderTask() rather
+       * than sending two frames now - the followers share one back-channel and
+       * must not answer at the same time. Arming the timer makes the sequence
+       * start on the next pass of loop().
+       */
+      pollTimer_ = cfg::REPORT_POLL_MS;
+      pollStage_ = 0;
+      Serial.println("Status requested from both followers.");
+
     } else {
       Serial.println("Unknown : command");
     }
@@ -442,10 +547,13 @@ void Controller::leaderTask() {
       leds_.show(status::PLAYING);
       gapTimer_ = 0;
 
+#if AUDIO_TRACE
       /*
        * Audio-health trace, leader only, once a second while playing.
+       * Compiled out unless AUDIO_TRACE is 1 in config.h, so the USB console
+       * stays quiet in normal field operation.
        *
-       * mem climbing toward the AudioMemory() ceiling, or t failing to advance
+       * mem climbing toward cfg::AUDIO_MEMORY_BLOCKS, or t failing to advance
        * by roughly 1000 between lines, means the SD path is starving. Both
        * staying healthy through an audible fault means the digital side is
        * delivering correctly and the problem is downstream in the analog chain.
@@ -457,6 +565,7 @@ void Controller::leaderTask() {
                       AudioEngine::memMax(), AudioEngine::cpuMax());
         AudioEngine::statsReset();
       }
+#endif
     }
   } else {
     if (audio_.isPlaying()) audio_.stop();

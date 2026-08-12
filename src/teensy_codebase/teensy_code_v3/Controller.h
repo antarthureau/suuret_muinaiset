@@ -84,6 +84,17 @@ private:
 
   void feedWdt();
 
+  /**
+   * Blink any faults found during setup on the status LEDs, then hand the
+   * display back to loop(). Called once, at the end of setup().
+   *
+   * Faults are announced, not latched: a unit running normally shows its
+   * normal state code, so re-reading the fault means rebooting the unit and
+   * watching the array during startup. Blocks for a few seconds per fault,
+   * feeding the watchdog throughout.
+   */
+  void announceFaults();
+
   /** Apply an awake/asleep transition. Edge-triggered; a repeat is a no-op. */
   void applyAwake(bool target);
 

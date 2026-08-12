@@ -10,11 +10,12 @@
 
 void AudioEngine::begin(float volume) {
   /*
-   * Headroom against SD read-latency spikes. The Teensy 4 has RAM to spare, so
-   * this is bought cheaply. Watch memMax() in the leader's trace: if it climbs
-   * toward this ceiling during playback, the card is not keeping up.
+   * Headroom against SD read-latency spikes. See cfg::AUDIO_MEMORY_BLOCKS for
+   * what a block is and why the pool is deliberately oversized. Watch memMax()
+   * in the leader's trace: if it climbs toward this ceiling during playback,
+   * the card is not keeping up.
    */
-  AudioMemory(120);
+  AudioMemory(cfg::AUDIO_MEMORY_BLOCKS);
 
   codecOk_ = sgtl_.enable();
   volume_  = volume;
