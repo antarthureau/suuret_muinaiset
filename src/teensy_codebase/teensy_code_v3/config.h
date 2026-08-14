@@ -38,7 +38,7 @@
  * A hang will NOT self-recover while this is 0. Set it back to 1 before the
  * units are left running unattended on site.
  */
-#define USE_WATCHDOG 1
+#define USE_WATCHDOG 0
 
 /**
  * Leader audio-health trace toggle.
