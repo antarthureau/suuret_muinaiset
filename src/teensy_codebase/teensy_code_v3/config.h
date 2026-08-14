@@ -28,9 +28,9 @@
  *
  * With 1, any hang self-recovers after cfg::WDT_TIMEOUT_S. This requires the
  * third-party WDT_T4 library (tonton81) to be installed AND the board target
- * set to a Teensy 4.x. Watchdog_t4.h only declares WDT_T4 and WDOG1 for the
+ * set to a Teensy 4.x. Watchdog_t4.h only declares WDT_T4 and WDT1 for the
  * i.MX RT chip, so building with a Teensy 3.x selected strips the header to
- * nothing and fails with "'WDOG1' was not declared in this scope".
+ * nothing and fails with "'WDT1' was not declared in this scope".
  *
  * With 0, every watchdog reference compiles out and the library is not
  * needed at all.
@@ -38,7 +38,7 @@
  * A hang will NOT self-recover while this is 0. Set it back to 1 before the
  * units are left running unattended on site.
  */
-#define USE_WATCHDOG 0
+#define USE_WATCHDOG 1
 
 /**
  * Leader audio-health trace toggle.

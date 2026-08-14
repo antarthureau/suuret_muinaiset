@@ -159,7 +159,7 @@ private:
   elapsedMillis dbgTimer_;       // 1 Hz audio-health trace while playing
 
 #if USE_WATCHDOG
-  WDT_T4<WDOG1> wdt_;
+  WDT_T4<WDT1> wdt_;
 #endif
 };
 
