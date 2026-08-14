@@ -71,7 +71,7 @@
 
 class AudioEngine {
 public:
-  /** Allocate audio memory, enable the codec, mount the card. Never blocks. */
+  // Allocate audio memory, enable the codec, mount the card. Never blocks.
   void begin(float volume);
 
   bool codecReady() const { return codecOk_; }
@@ -86,16 +86,16 @@ public:
    */
   bool retryInit();
 
-  /** Start a file from the beginning, replacing anything already playing. */
+  // Start a file from the beginning, replacing anything already playing.
   bool play(const char *file);
   void stop();
   bool isPlaying();
 
-  /** Clamped to 0.0-1.0. Writes the codec over I2C, so avoid calling it often. */
+  // Clamped to 0.0-1.0. Writes the codec over I2C, so avoid calling it often.
   void  setVolume(float v);
   float volume() const { return volume_; }
 
-  /** Current envelope 0.0-1.0, or -1.0 if no new sample is available yet. */
+  // Current envelope 0.0-1.0, or -1.0 if no new sample is available yet.
   float level(bool peak);
 
   /* ---------------------------------------------------------------------

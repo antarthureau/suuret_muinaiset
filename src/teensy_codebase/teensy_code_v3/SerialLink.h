@@ -44,7 +44,7 @@
 
 #include <Arduino.h>
 
-/** One decoded frame. arg is always NUL-terminated, possibly empty. */
+// One decoded frame. arg is always NUL-terminated, possibly empty.
 struct Frame {
   char addr;
   char cmd;
@@ -57,7 +57,7 @@ public:
 
   void begin(unsigned long baud);
 
-  /** Build and transmit one frame. Oversized frames are dropped, not truncated. */
+  // Build and transmit one frame. Oversized frames are dropped, not truncated.
   void send(char addr, char cmd, const char *arg = "");
 
   /**

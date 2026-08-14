@@ -69,7 +69,7 @@ public:
   void loop();
 
 private:
-  /* ---- role ---- */
+  // ---- role ----
 
   /**
    * Read the hardware ID straps once at boot. Pins use the internal pulldown,
@@ -80,7 +80,7 @@ private:
   const char *fileForRole() const;
   char        myAddr() const;
 
-  /* ---- behaviour ---- */
+  // ---- behaviour ----
 
   void feedWdt();
 
@@ -95,25 +95,25 @@ private:
    */
   void announceFaults();
 
-  /** Apply an awake/asleep transition. Edge-triggered; a repeat is a no-op. */
+  // Apply an awake/asleep transition. Edge-triggered; a repeat is a no-op.
   void applyAwake(bool target);
 
-  /** Start this unit's file from the beginning and count the round. */
+  // Start this unit's file from the beginning and count the round.
   void playRound();
 
-  /** Sample the envelope and update the LED strip. Rate-limited internally. */
+  // Sample the envelope and update the LED strip. Rate-limited internally.
   void writePwm();
 
-  /** Read the volume pot, with a deadband so noise does not chatter the codec. */
+  // Read the volume pot, with a deadband so noise does not chatter the codec.
   void volumeFromKnob();
 
-  /** Execute one command, whatever its source. */
+  // Execute one command, whatever its source.
   void dispatch(char cmd, const char *arg);
 
-  /** Decide whether an incoming frame applies to this unit, then act. */
+  // Decide whether an incoming frame applies to this unit, then act.
   void handleFrame(const Frame &f);
 
-  /** Service the USB console: single keys and ':' line commands. */
+  // Service the USB console: single keys and ':' line commands.
   void usbPoll();
 
   void leaderTask();
@@ -121,14 +121,14 @@ private:
   void report();
   void reboot();
 
-  /* ---- subsystems ---- */
+  // ---- subsystems ----
   StatusLeds  leds_;
   Relays      relays_;
   AudioEngine audio_;
   RtcClock    rtc_;        // leader only; harmless and inert on followers
   SerialLink  link_;
 
-  /* ---- state ---- */
+  // ---- state ----
   Role        role_      = Role::LEADER;
   const char *file_      = "";
   bool        awake_     = false;

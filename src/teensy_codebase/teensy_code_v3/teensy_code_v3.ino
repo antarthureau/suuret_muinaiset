@@ -51,7 +51,6 @@
  */
 #include "Controller.h"
 
-/** The single Controller instance. Owns every subsystem; see Controller.h. */
 Controller controller;
 
 void setup() { controller.setup(); }

@@ -26,14 +26,14 @@
 
 class StatusLeds {
 public:
-  /** Configure the four pins as outputs and clear the display. */
+  // Configure the four pins as outputs and clear the display.
   void begin();
 
-  /** Display a status code. Values outside 0-15 are ignored. */
+  // Display a status code. Values outside 0-15 are ignored.
   void show(int code);
 
 private:
-  /** Write all four LEDs at once, MSB first. */
+  // Write all four LEDs at once, MSB first.
   void pattern(bool b3, bool b2, bool b1, bool b0);
 };
 

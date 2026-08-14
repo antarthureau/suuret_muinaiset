@@ -470,7 +470,7 @@ void Controller::handleFrame(const Frame &f) {
   if (!forMe) return;
 
   if (f.cmd == proto::CMD_REPORT) {
-    /* Reply only when individually addressed; see SerialLink.h on collisions. */
+    // Reply only when individually addressed; see SerialLink.h on collisions.
     char s[40];
     snprintf(s, sizeof(s), "%d,%d,%d,%.1f",
              (int)role_, awake_ ? 1 : 0, playing_ ? 1 : 0, tempmonGetTemp());
@@ -512,7 +512,7 @@ void Controller::usbPoll() {
     }
     line[i] = 0;
 
-    /* Clock commands are leader business; on a follower rtc_ is inert. */
+    // Clock commands are leader business; on a follower rtc_ is inert.
     if (strncmp(line, "settime", 7) == 0) {
       int Y, Mo, D, H, Mi, S;
       if (sscanf(line + 7, "%d %d %d %d %d %d", &Y, &Mo, &D, &H, &Mi, &S) == 6) {
@@ -591,7 +591,7 @@ void Controller::usbPoll() {
   * The leader also polls the followers for status, staggered so only one follower transmits at a time.
   */
 void Controller::leaderTask() {
-  /* Schedule. Broadcast before applying, so followers switch with us. */
+  // Schedule. Broadcast before applying, so followers switch with us.
   if (statusTimer_ >= cfg::SCHEDULE_POLL_MS) {
     statusTimer_ = 0;
     bool shouldWake = rtc_.isActiveHour(cfg::START_HOUR, cfg::END_HOUR);
@@ -602,7 +602,7 @@ void Controller::leaderTask() {
     }
   }
 
-  /* Heartbeat: restates awake state so late or rebooted followers self-sync. */
+  // Heartbeat: restates awake state so late or rebooted followers self-sync. 
   if (heartTimer_ >= cfg::HEARTBEAT_MS) {
     heartTimer_ = 0;
     link_.send(proto::ADDR_ALL, proto::CMD_HEART, awake_ ? "1" : "0");
@@ -734,15 +734,15 @@ void Controller::report() {
 void Controller::reboot() {
   Serial.println("Rebooting shortly.");
 
-  /* Relay the command before resetting, or the followers keep running alone. */
+  // Relay the command before resetting, or the followers keep running alone.
   if (role_ == Role::LEADER) link_.send(proto::ADDR_ALL, proto::CMD_REBOOT, "");
 
-  /* Power down cleanly so the reset does not thump through the speaker. */
+  // Power down cleanly so the reset does not thump through the speaker.
   if (awake_) relays_.sleep();
   awake_ = false;
   leds_.show(status::REBOOT);
 
-  /* Hold long enough for the LED code to be readable, feeding the watchdog. */
+  // Hold long enough for the LED code to be readable, feeding the watchdog.
   unsigned long t0 = millis();
   while (millis() - t0 < 3000) feedWdt();
 

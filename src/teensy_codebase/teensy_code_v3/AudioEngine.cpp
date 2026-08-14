@@ -98,12 +98,6 @@ void AudioEngine::setVolume(float v) {
  * @return The audio level, or -1.0 if no new data is available.
  */
 float AudioEngine::level(bool peak) {
-  /*
-   * Both analyzers run, but only the selected one is read. available() is
-   * false until the analyzer has accumulated a new window, so -1.0 means
-   * "nothing new yet" rather than "silence" - the caller must not treat it as
-   * a level.
-   */
   if (peak) return peak_.available() ? peak_.read() : -1.0f;
   return rms_.available() ? rms_.read() : -1.0f;
 }

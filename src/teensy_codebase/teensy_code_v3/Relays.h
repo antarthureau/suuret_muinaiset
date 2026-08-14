@@ -34,19 +34,19 @@
 
 class Relays {
 public:
-  /** Configure both pins as outputs and de-energize, whatever the polarity. */
+  // Configure both pins as outputs and de-energize, whatever the polarity.
   void begin();
 
-  /** Amp on, dwell, speaker on. No-op if already awake. */
+  // Amp on, dwell, speaker on. No-op if already awake.
   void wake();
 
-  /** Speaker off, dwell, amp off. No-op if already asleep. */
+  // Speaker off, dwell, amp off. No-op if already asleep.
   void sleep();
 
   bool awake() const { return awake_; }
 
 private:
-  /** Drive one relay pin, translating through cfg::RELAY_ACTIVE_LOW. */
+  // Drive one relay pin, translating through cfg::RELAY_ACTIVE_LOW.
   void set(uint8_t pin, bool on);
 
   bool awake_ = false;

@@ -38,12 +38,12 @@
 
 class RtcClock {
 public:
-  /** Probe the module. False if it is not on the bus. */
+  // Probe the module. False if it is not on the bus.
   bool begin();
 
   bool ok() const { return ok_; }
 
-  /** Current hour 0-23, or 0 if the module is unavailable. */
+  // Current hour 0-23, or 0 if the module is unavailable.
   uint8_t hour();
 
   /**
@@ -53,7 +53,7 @@ public:
    */
   bool isActiveHour(uint8_t startHour, uint8_t endHour);
 
-  /** Set the clock explicitly. This is the intended way to set the time. */
+  // Set the clock explicitly. This is the intended way to set the time.
   void setTime(int Y, int Mo, int D, int H, int Mi, int S);
 
   /**
@@ -63,7 +63,7 @@ public:
    */
   void syncToCompile();
 
-  /** Print the current time to a stream, or a notice if unavailable. */
+  // Print the current time to a stream, or a notice if unavailable.
   void print(Stream &s);
 
 private:
