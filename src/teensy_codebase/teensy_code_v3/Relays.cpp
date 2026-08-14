@@ -5,11 +5,18 @@
 #include "Relays.h"
 #include "config.h"
 
+/**
+ * Drive one relay pin, translating through cfg::RELAY_ACTIVE_LOW.
+ * @param pin The Teensy pin to drive.
+ * @param on  True to energize the relay, false to de-energize.
+ */
 void Relays::set(uint8_t pin, bool on) {
   const bool level = cfg::RELAY_ACTIVE_LOW ? !on : on;
   digitalWrite(pin, level ? HIGH : LOW);
 }
-
+ /**
+ * Initialize the relay pins.
+ */
 void Relays::begin() {
   pinMode(cfg::REL_AMP, OUTPUT);
   pinMode(cfg::REL_SPK, OUTPUT);
@@ -18,6 +25,9 @@ void Relays::begin() {
   awake_ = false;
 }
 
+/**
+ * Wake up the relays.
+ */
 void Relays::wake() {
   if (awake_) return;
   set(cfg::REL_AMP, true);
@@ -27,6 +37,9 @@ void Relays::wake() {
   awake_ = true;
 }
 
+/**
+ * Put the relays to sleep.
+ */
 void Relays::sleep() {
   if (!awake_) return;
   set(cfg::REL_SPK, false);     // disconnect before the rail collapses

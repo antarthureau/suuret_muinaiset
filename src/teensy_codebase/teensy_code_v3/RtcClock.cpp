@@ -4,6 +4,14 @@
  */
 #include "RtcClock.h"
 
+/**
+ * Initialize the RTC. Returns true if the RTC is present and responding.
+ * If the RTC is present but the backup cell has failed, the time is set to the
+ * compile time. If the RTC is present and the backup cell is good, the stored
+ * time is preserved. If the RTC is not present, the module is marked as
+ * unavailable and all time queries return 0.
+ * @return True if the RTC is present and responding, false otherwise.
+ */
 bool RtcClock::begin() {
   ok_ = rtc_.begin();
   if (!ok_) return false;
@@ -22,24 +30,50 @@ bool RtcClock::begin() {
   return true;
 }
 
+/**
+ * Get the current hour.
+ * @return The current hour, or 0 if the RTC is unavailable.
+ */
 uint8_t RtcClock::hour() {
   return ok_ ? rtc_.now().hour() : 0;
 }
 
+/**
+ * Check if the current hour is within the active range.
+ * @param startHour The start hour of the active range.
+ * @param endHour The end hour of the active range.
+ * @return True if the current hour is within the active range, false otherwise.
+ */
 bool RtcClock::isActiveHour(uint8_t startHour, uint8_t endHour) {
   if (!ok_) return false;      // unknown time: stay asleep
   uint8_t h = rtc_.now().hour();
   return (h >= startHour && h < endHour);
 }
 
+/**
+ * Set the time on the RTC.
+ * @param Y The year.
+ * @param Mo The month.
+ * @param D The day.
+ * @param H The hour.
+ * @param Mi The minute.
+ * @param S The second.
+ */
 void RtcClock::setTime(int Y, int Mo, int D, int H, int Mi, int S) {
   if (ok_) rtc_.adjust(DateTime(Y, Mo, D, H, Mi, S));
 }
 
+/**
+ * Synchronize the RTC to the compile time.
+ */
 void RtcClock::syncToCompile() {
   if (ok_) rtc_.adjust(DateTime(F(__DATE__), F(__TIME__)));
 }
 
+/**
+ * Print the current time to the specified stream.
+ * @param s The stream to print to.
+ */
 void RtcClock::print(Stream &s) {
   if (!ok_) { s.println("RTC unavailable"); return; }
   DateTime t = rtc_.now();

@@ -8,6 +8,10 @@
 #include <SPI.h>
 #include <SD.h>
 
+/**
+ * Allocate audio memory, enable the codec, mount the card. Never blocks.
+ * @param volume The initial codec volume, 0.0-1.0.
+ */
 void AudioEngine::begin(float volume) {
   /*
    * Headroom against SD read-latency spikes. See cfg::AUDIO_MEMORY_BLOCKS for
@@ -30,6 +34,11 @@ void AudioEngine::begin(float volume) {
   sdOk_ = SD.begin(cfg::SD_CS);
 }
 
+/**
+ * Attempt to bring up whatever failed at boot. Returns true once both the
+ * codec and the card are ready.
+ * @return True if both the codec and the SD card are ready, false otherwise.
+ */
 bool AudioEngine::retryInit() {
   /*
    * Caller is responsible for not invoking this during playback: SD.begin()
@@ -49,15 +58,33 @@ bool AudioEngine::retryInit() {
   return codecOk_ && sdOk_;
 }
 
+/**
+ * Function to play an audio file from the SD card.
+ * @param file The name of the audio file to play.
+ * @return True if the file was successfully started, false otherwise.
+ */
 bool AudioEngine::play(const char *file) {
   if (!sdOk_) return false;
   wav_.stop();                  // rewind if a round is somehow still running
   return wav_.play(file);
 }
 
+/**
+ * Function to stop the audio playback.
+ */
 void AudioEngine::stop()      { wav_.stop(); }
+
+/**
+ * Function to check if the audio is playing.
+ * @return True if audio is playing, false otherwise.
+ */
 bool AudioEngine::isPlaying() { return wav_.isPlaying(); }
 
+/**
+  * Function to set the volume of the codec.
+  * The codec is written over I2C, so avoid calling this function often.
+  * @param v The volume to set, clamped to 0.0-1.0.
+ */
 void AudioEngine::setVolume(float v) {
   if (v < 0.0f) v = 0.0f;
   if (v > 1.0f) v = 1.0f;
@@ -65,6 +92,11 @@ void AudioEngine::setVolume(float v) {
   if (codecOk_) sgtl_.volume(volume_);
 }
 
+/**
+ * Function to get the audio level.
+ * @param peak True to get the peak level, false to get the RMS level.
+ * @return The audio level, or -1.0 if no new data is available.
+ */
 float AudioEngine::level(bool peak) {
   /*
    * Both analyzers run, but only the selected one is read. available() is

@@ -36,6 +36,13 @@ Role Controller::detectRole() {
   return Role::LEADER;
 }
 
+/**
+ * Return the WAV file name for this unit's role. The leader plays a long
+ * file, the followers play their own short files. The file is never changed
+ * after boot, so the leader can schedule rounds without asking the followers.
+ * @param role The role to query.
+ * @return The file name for the role, or "" if the role is unknown.
+ */
 const char *Controller::fileForRole() const {
   switch (role_) {
     case Role::SMALL:    return cfg::FILE_SMALL;
@@ -44,6 +51,15 @@ const char *Controller::fileForRole() const {
   }
 }
 
+/**
+ * Return the address for this unit's role. The leader is '0', the followers
+ * are '1' and '2'. The address is never changed after boot, so the leader
+ * can schedule rounds without asking the followers. The address is used in
+ * the back-channel protocol to decide whether an incoming frame applies to
+ * this unit.
+ * @param role The role to query.
+ * @return The address for the role, or '0' if the role is unknown.
+ */
 char Controller::myAddr() const {
   switch (role_) {
     case Role::SMALL:    return proto::ADDR_SMALL;
@@ -56,6 +72,12 @@ char Controller::myAddr() const {
  * WATCHDOG
  * ========================================================================= */
 
+ /**
+  * Feed the watchdog. The watchdog is enabled at boot and fed throughout
+  * loop() and during any blocking operations, so a slow subsystem cannot
+  * trip it. The watchdog is disabled at compile time for development builds
+  * to avoid a crash loop when stepping through code.
+  */
 void Controller::feedWdt() {
 #if USE_WATCHDOG
   wdt_.feed();
@@ -66,6 +88,12 @@ void Controller::feedWdt() {
  * SETUP
  * ========================================================================= */
 
+ /**
+  * Initialize the controller and all subsystems. Called once at boot.
+  * The watchdog is enabled at boot and fed throughout setup() and loop(),
+  * so a slow subsystem cannot trip it. The watchdog is disabled at compile
+  * time for development builds to avoid a crash loop when stepping through code.
+  */
 void Controller::setup() {
   /*
    * Baud is ignored on the Teensy's USB serial, which always runs at native
@@ -138,6 +166,10 @@ void Controller::setup() {
  * is fed throughout.
  * ========================================================================= */
 
+ /**
+  * Blink any faults found during setup on the status LEDs, then hand the display
+  * back to loop(). Called once, at the end of setup().
+  */
 void Controller::announceFaults() {
   int faults[3];
   int n = 0;
@@ -178,6 +210,12 @@ void Controller::announceFaults() {
  * trip it, then recover, then drain inputs, then run the role's state machine.
  * ========================================================================= */
 
+ /**
+  * Main loop. Called repeatedly after setup() completes. The watchdog is fed
+  * first, so a slow subsystem cannot trip it. The watchdog is disabled at
+  * compile time for development builds to avoid a crash loop when stepping
+  * through code.
+  */
 void Controller::loop() {
   feedWdt();
 
@@ -193,6 +231,7 @@ void Controller::loop() {
     audio_.retryInit();
   }
 
+  //USB console polling is first so a key typed on the console and a frame arriving on Serial3 cannot diverge in behaviour.
   usbPoll();
 
   /* Drain every frame that arrived since the last pass. */
@@ -209,6 +248,11 @@ void Controller::loop() {
  * BEHAVIOUR
  * ========================================================================= */
 
+/**
+ * Apply an awake/asleep transition. Edge-triggered; a repeat is a no-op. The
+ * relay sequencing blocks for about a second. Feed the watchdog on the way in so the transition cannot be mistaken for a hang.
+ * @param target True to wake, false to sleep.
+ */
 void Controller::applyAwake(bool target) {
   if (target == awake_) return;          // edge-triggered
 
@@ -224,6 +268,11 @@ void Controller::applyAwake(bool target) {
   if (!target) audio_.stop();
 }
 
+/**
+ * Start this unit's file from the beginning and count the round. The file is
+ * never changed after boot, so the leader can schedule rounds without asking
+ * the followers.
+ */
 void Controller::playRound() {
   if (!awake_) return;
 
@@ -237,6 +286,11 @@ void Controller::playRound() {
   }
 }
 
+/** 
+ * Sample the envelope and update the LED strip. Rate-limited internally.
+ * The envelope is clamped to the range 0-255, then scaled by range and written to the PWM pin.
+ * The PWM pin is configured for 8-bit resolution and a frequency above the audible range.
+ */
 void Controller::writePwm() {
   if (pwmTimer_ < cfg::PWM_UPDATE_MS) return;
   pwmTimer_ = 0;
@@ -250,6 +304,11 @@ void Controller::writePwm() {
   analogWrite(cfg::PWM_PIN, v);
 }
 
+/**
+ * Read the volume pot, with a deadband so noise does not chatter the codec.
+ * The pot is read every VOL_POLL_MS milliseconds, and the value is quantized to
+ * 0.1 steps before being sent to the codec and broadcasted over Serial3.
+ */
 void Controller::volumeFromKnob() {
   if (knobTimer_ < cfg::VOL_POLL_MS) return;
   knobTimer_ = 0;
@@ -283,6 +342,14 @@ void Controller::volumeFromKnob() {
  * frame arriving on Serial3 cannot diverge in behaviour.
  * ========================================================================= */
 
+ /**
+  * Execute one command, whatever its source. The command is a single character,
+  * optionally followed by a string argument. The command is dispatched to the
+  * appropriate handler, which may be a no-op if the command is not relevant to
+  * this unit's role or state.
+  * @param cmd The command character.
+  * @param arg The optional argument string, or nullptr if none. 
+  */
 void Controller::dispatch(char cmd, const char *arg) {
   switch (cmd) {
     case proto::CMD_PLAY:
@@ -362,6 +429,14 @@ void Controller::dispatch(char cmd, const char *arg) {
  * INCOMING FRAMES
  * ========================================================================= */
 
+ /**
+  * Decide whether an incoming frame applies to this unit, then act. The frame
+  * is addressed to either all units or a specific unit. The leader only ever
+  * listens for status replies, so it ignores commands from the bus. A follower
+  * may be addressed directly or as part of a broadcast. The frame is acted on
+  * immediately, so a reflected frame cannot drive the installation.
+  * @param f The incoming frame.
+  */
 void Controller::handleFrame(const Frame &f) {
   /*
    * The leader only ever listens for status replies. It must not act on
@@ -413,6 +488,9 @@ void Controller::handleFrame(const Frame &f) {
  * timeout so a half-typed line cannot stall the loop.
  * ========================================================================= */
 
+  /**
+  * Poll the USB console for input.
+  */
 void Controller::usbPoll() {
   if (!Serial.available()) return;
 
@@ -507,6 +585,11 @@ void Controller::usbPoll() {
  * LEADER
  * ========================================================================= */
 
+ /** 
+  * Run the leader state machine. The leader schedules rounds, broadcasts awake/asleep transitions,
+  * and restates its awake state so late or rebooted followers self-sync.
+  * The leader also polls the followers for status, staggered so only one follower transmits at a time.
+  */
 void Controller::leaderTask() {
   /* Schedule. Broadcast before applying, so followers switch with us. */
   if (statusTimer_ >= cfg::SCHEDULE_POLL_MS) {
@@ -600,6 +683,10 @@ void Controller::leaderTask() {
  * it in, and reports a stale link without changing its behaviour.
  * ========================================================================= */
 
+ /**
+  * Run the follower state machine. The follower renders whatever state the leader last put it in,
+  * and reports a stale link without changing its behaviour.
+  */
 void Controller::followerTask() {
   bool stale = linkTimer_ > cfg::LINK_STALE_MS;
 
@@ -622,6 +709,9 @@ void Controller::followerTask() {
  * REPORT / REBOOT
  * ========================================================================= */
 
+ /**
+  * Report the unit's current status.
+  */
 void Controller::report() {
   Serial.println(F("\n----- REPORT -----"));
   Serial.print("Role ");       Serial.println((int)role_);
@@ -638,6 +728,9 @@ void Controller::report() {
   Serial.println(F("----- END -----\n"));
 }
 
+/**
+ * Reboot the unit.
+ */
 void Controller::reboot() {
   Serial.println("Rebooting shortly.");
 
