@@ -1,5 +1,5 @@
 /**
- * config.h - compile-time configuration for Suuret Muinaiset (V2)
+ * config.h - compile-time configuration for Suuret Muinaiset (V3)
  *
  * All pins, timings and protocol constants live here. Nothing in this file
  * allocates storage that varies at runtime; values are constexpr so they
@@ -12,7 +12,7 @@
 
 // Set to 0 to build without the hardware watchdog (e.g. if Watchdog_t4 is
 // not installed). With 1, any hang self-recovers after WDT_TIMEOUT_S.
-#define USE_WATCHDOG 1
+#define USE_WATCHDOG 0
 
 namespace cfg {
   // ---- hardware ID strap pins (HIGH selects the role) ----

@@ -69,7 +69,7 @@ private:
   elapsedMillis linkTimer_, gapTimer_, retryTimer_, pwmTimer_;
 
 #if USE_WATCHDOG
-  WDT_T4<WDOG1> wdt_;
+  WDT_T4<WDT1> wdt_;
 #endif
 };
 
