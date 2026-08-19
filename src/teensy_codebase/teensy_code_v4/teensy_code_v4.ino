@@ -55,8 +55,17 @@
  * config.h.
  */
 #include "Controller.h"
+#include "FaultHandler.h"
 
 Controller controller;
 
-void setup() { controller.setup(); }
+void setup() {
+  /*
+   * Must run before anything else: installs the fault-vector hooks and
+   * paints the stack-headroom sentinel while the stack is at its shallowest.
+   * See FaultHandler.h for why this exists and how to read its output.
+   */
+  FaultHandler::begin();
+  controller.setup();
+}
 void loop()  { controller.loop(); }

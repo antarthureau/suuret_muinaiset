@@ -3,6 +3,7 @@
  * See Controller.h for the architecture and why nothing here blocks.
  */
 #include "Controller.h"
+#include "FaultHandler.h"
 #include <math.h>
 
 /* ===========================================================================
@@ -106,6 +107,14 @@ void Controller::setup() {
 
   /* Surviving crash data from the previous run, if any. */
   if (CrashReport) { Serial.print("Crash: "); Serial.println(CrashReport); }
+
+  /*
+   * Extended fault record from FaultHandler, if any - same idea as
+   * CrashReport above, but also carries LR (the return address of whatever
+   * call/branch landed on the bad PC) and a stack-headroom check. See
+   * FaultHandler.h.
+   */
+  FaultHandler::reportIfPending(Serial);
 
   role_ = detectRole();
   file_ = fileForRole();
