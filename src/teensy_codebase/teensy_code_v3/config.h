@@ -1,5 +1,5 @@
 /**
- * config.h - compile-time configuration for Suuret Muinaiset (V3)
+ * config.h - compile-time configuration for Suuret Muinaiset (V3).
  *
  * PURPOSE
  *   Single source of truth for every pin, timing, threshold and protocol
@@ -23,8 +23,26 @@
 
 #include <Arduino.h>
 
-// Set to 0 to build without the hardware watchdog (e.g. if Watchdog_t4 is
-// not installed). With 1, any hang self-recovers after WDT_TIMEOUT_S.
+/**
+ * Hardware watchdog toggle.
+ *
+ * With 1, any hang self-recovers after cfg::WDT_TIMEOUT_S. This requires the
+ * third-party WDT_T4 library (tonton81) to be installed AND the board target
+ * set to a Teensy 4.x. Watchdog_t4.h only declares WDT_T4 and WDT1 for the
+ * i.MX RT chip, so building with a Teensy 3.x selected strips the header to
+ * nothing and fails with "'WDT1' was not declared in this scope".
+ *
+ * With 0, every watchdog reference compiles out and the library is not
+ * needed at all.
+ *
+ * A hang will NOT self-recover while this is 0.
+ *
+ * Kept at 0 deliberately (2026-08-24). Before setting this to 1, fix
+ * Controller::setup(): WDT_timings_t is only partially initialized there, so
+ * its remaining members - including any pretimeout callback pointer - are
+ * stack garbage handed straight to wdt_.begin(). Change that declaration to
+ * "WDT_timings_t t = {};" first. The UB is masked only while this is 0.
+ */
 #define USE_WATCHDOG 0
 
 /**
