@@ -6,7 +6,7 @@
  * subsystems, so this file stays trivial.
  *
  * Build:
- *   Open Arduino IDE, select Teensy 4.1 as the board, select which board to upload to, and click Upload.
+ *   Open Arduino IDE, select Teensy 4.0 as the board, select which board to upload to, and click Upload.
  */
 #include "Controller.h"
 
